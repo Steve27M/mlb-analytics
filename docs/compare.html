@@ -1,0 +1,141 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DIAMONDIQ — Compare Teams</title><meta name="description" content="Head-to-head MLB team comparison: record, run environment, and Pythagorean expectation for any two teams in a season.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Saira+Condensed:wght@600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
+:root{
+  --a:#ef4b4b; --a2:#9e1f1f; --aText:#1a0505;
+  --bg:#08090c; --text:#f4f6fb; --sub:#8a94a6; --border:rgba(255,255,255,.09);
+  --panel:#13161e; --panel2:#0c0e14; --good:#3ddc84; --bad:#ff6b6b; --gold:#ffd166;
+}
+*{box-sizing:border-box;} html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;
+  background:radial-gradient(140% 55% at 50% 0%,color-mix(in srgb,var(--a) 14%,var(--bg)) 0%,var(--bg) 52%);
+  background-attachment:fixed;padding-bottom:70px;}
+a{color:inherit;text-decoration:none;}
+::-webkit-scrollbar{width:11px;height:11px;} ::-webkit-scrollbar-track{background:#0c0e13;}
+::-webkit-scrollbar-thumb{background:#242833;border-radius:6px;}
+.wrap{max-width:1120px;margin:0 auto;padding:0 26px;}
+.nav{position:sticky;top:0;z-index:40;backdrop-filter:blur(14px);background:rgba(8,9,13,.82);border-bottom:1px solid var(--border);}
+.nav .in{display:flex;align-items:center;gap:20px;padding:12px 26px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:9px;}
+.brand .bar{width:9px;height:26px;border-radius:3px;background:linear-gradient(var(--a),var(--a2));}
+.brand .txt{font:800 15px 'Saira Condensed';letter-spacing:.14em;}
+.navlinks{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto;}
+.navlinks a{font:600 12px 'Space Grotesk';letter-spacing:.04em;color:var(--sub);padding:7px 12px;border-radius:8px;}
+.navlinks a:hover{color:var(--text);background:var(--panel);}
+.navlinks a.active{color:var(--aText);background:var(--a);}
+.hero{padding:44px 0 8px;}
+.hero .eyebrow{font:600 12px 'Space Grotesk';letter-spacing:.22em;color:var(--a);text-transform:uppercase;}
+.hero h1{font:400 clamp(40px,6vw,68px)/.92 'Anton';text-transform:uppercase;margin:10px 0 0;}
+.hero p{font:400 16px/1.6 'Space Grotesk';color:var(--sub);max-width:700px;margin:14px 0 0;}
+.sec{display:flex;align-items:center;gap:12px;margin:38px 0 16px;}
+.sec h2{font:400 22px 'Anton';letter-spacing:.02em;text-transform:uppercase;margin:0;}
+.sec .line{flex:1;height:1px;background:var(--border);}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.card{border-radius:16px;border:1px solid var(--border);background:var(--panel);padding:18px 20px;display:flex;flex-direction:column;gap:10px;}
+.card .name{font:400 21px 'Anton';text-transform:uppercase;letter-spacing:.01em;}
+.badge{font:700 10px 'Space Grotesk';letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid var(--border);color:var(--sub);white-space:nowrap;}
+.badge.good{color:var(--aText);background:var(--good);border-color:var(--good);}
+.badge.a{color:var(--aText);background:var(--a);border-color:var(--a);}
+.badge.gold{color:#1a0505;background:var(--gold);border-color:var(--gold);}
+.card .def{font:400 14px/1.6 'Space Grotesk';color:var(--text);}
+.card .read{font:400 13px/1.6 'Space Grotesk';color:var(--sub);border-left:2px solid var(--a);padding-left:12px;}
+.card .read b{color:var(--text);font-weight:600;}
+.stat{font:700 30px 'Saira Condensed';}
+.stat .u{font:600 13px 'Space Grotesk';color:var(--sub);margin-left:6px;}
+.kv{display:flex;justify-content:space-between;font:500 13px 'Space Grotesk';color:var(--sub);padding:3px 0;}
+.kv b{color:var(--text);font:700 13px 'JetBrains Mono';}
+.mono{font-family:'JetBrains Mono';}
+.dist{margin-top:2px;}
+.dist .track{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--panel2),color-mix(in srgb,var(--a) 30%,var(--panel2)));border:1px solid var(--border);}
+.dist .med{position:absolute;top:-3px;width:2px;height:16px;background:var(--text);border-radius:2px;}
+.dist .ends{display:flex;justify-content:space-between;margin-top:7px;font:600 11px 'JetBrains Mono';color:var(--sub);}
+.dist .ex{display:flex;justify-content:space-between;gap:8px;margin-top:9px;font:500 11px 'Space Grotesk';}
+.dist .ex .chip{display:flex;align-items:center;gap:6px;color:var(--sub);}
+.dist .ex .chip b{font:700 12px 'Saira Condensed';color:var(--text);}
+.dist .ex .dot{width:7px;height:7px;border-radius:2px;}
+.toolbar{display:flex;gap:12px;align-items:center;margin:26px 0 6px;flex-wrap:wrap;}
+.search{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:11px 15px;}
+.search input,select{background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font:500 14px 'Space Grotesk';padding:9px 12px;outline:none;}
+.search input{flex:1;border:none;padding:0;background:none;}
+.count{font:600 12px 'JetBrains Mono';color:var(--sub);}
+.empty{grid-column:1/-1;text-align:center;color:var(--sub);font:500 14px 'Space Grotesk';padding:40px;}
+footer{margin-top:44px;font:500 12px/1.7 'Space Grotesk';color:var(--sub);}
+footer a{color:var(--a);}
+.cmp{display:grid;grid-template-columns:1fr 60px 1fr;gap:10px;align-items:center;margin:8px 0;}
+.cmp .lab{grid-column:1/-1;text-align:center;font:600 11px 'Space Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-top:8px;}
+.cmp .bar{height:26px;border-radius:6px;background:var(--panel2);position:relative;overflow:hidden;border:1px solid var(--border);}
+.cmp .fill{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,var(--a2),var(--a));}
+.cmp .fill.r{right:0;} .cmp .fill.l{left:0;}
+.cmp .v{position:absolute;top:5px;font:700 13px 'JetBrains Mono';color:#fff;}
+.cmp .mid{text-align:center;font:600 11px 'Space Grotesk';color:var(--sub);}
+.dhead{font:400 18px 'Anton';text-transform:uppercase;letter-spacing:.02em;color:var(--a);}
+.shdr{display:grid;grid-template-columns:1.3fr .9fr 1.4fr;gap:8px;font:600 10px 'Space Grotesk';letter-spacing:.06em;text-transform:uppercase;color:var(--sub);padding-bottom:4px;border-bottom:1px solid var(--border);}
+.srow{display:grid;grid-template-columns:1.3fr .9fr 1.4fr;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.steam{display:flex;align-items:center;gap:7px;font:700 14px 'Saira Condensed';}
+.steam .srec{font:500 11px 'JetBrains Mono';color:var(--sub);}
+.pdot{width:8px;height:8px;border-radius:2px;background:var(--gold);flex:none;}
+.pdot.off{background:rgba(255,255,255,.12);}
+.sproj{font:700 16px 'JetBrains Mono';display:flex;flex-direction:column;line-height:1.1;}
+.sproj .srange{font:500 10px 'JetBrains Mono';color:var(--sub);}
+.obar{position:relative;height:18px;border-radius:5px;background:var(--panel2);border:1px solid var(--border);overflow:hidden;}
+.obar .ofill{position:absolute;top:0;bottom:0;left:0;}
+.obar .oval{position:absolute;right:6px;top:2px;font:700 11px 'JetBrains Mono';color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);}
+@media(max-width:760px){.grid,.grid3{grid-template-columns:1fr;}}
+</style></head><body><div class="nav"><div class="in">
+  <a class="brand" href="index.html"><span class="bar"></span><span class="txt">DIAMOND<span style="color:var(--a);">IQ</span></span></a>
+  <div class="navlinks">
+    <a href="compare.html" class="active">Compare Teams</a>
+    <a href="simulator.html">Season Sim</a>
+    <a href="glossary.html">Stat Guide</a>
+    <a href="models.html">The Models</a>
+    <a href="index.html">Dashboard</a>
+    <a href="https://github.com/Steve27M/mlb-analytics" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</div></div><div class="wrap"><div class="hero"><div class="eyebrow">Head to head</div><h1>Compare Teams</h1>
+      <p>Pick a season and two teams. Record, runs scored and allowed, run differential, and the
+      Pythagorean win rate their run environment implies.</p></div>
+      <div class="toolbar">
+        <select id="season"></select><select id="ta"></select>
+        <span class="mid" style="color:var(--sub);font:700 13px 'Anton';">VS</span>
+        <select id="tb"></select></div>
+      <div id="body" style="margin-top:20px;"></div><footer>
+  Built from the <a href="https://github.com/Steve27M/mlb-analytics">mlb-analytics</a> warehouse (2,184,101 pitches,
+  2023–2025). Data: MLB Advanced Media
+  (statsapi / Baseball Savant) — individual, non-commercial, non-bulk use; raw data not
+  redistributed. Player crosswalk: Chadwick Bureau (ODC-By). Draft: Wikipedia (CC BY-SA).
+  Aggregates and code only.
+</footer><script>const TEAMS=[{"team_name": "Atlanta Braves", "season": 2023, "w": 103.0, "l": 58.0, "rs": 943.0, "ra": 716.0, "win_pct": 0.64, "pyth": 0.623}, {"team_name": "Baltimore Orioles", "season": 2023, "w": 101.0, "l": 61.0, "rs": 807.0, "ra": 678.0, "win_pct": 0.623, "pyth": 0.579}, {"team_name": "Los Angeles Dodgers", "season": 2023, "w": 100.0, "l": 62.0, "rs": 906.0, "ra": 699.0, "win_pct": 0.617, "pyth": 0.616}, {"team_name": "Tampa Bay Rays", "season": 2023, "w": 99.0, "l": 63.0, "rs": 860.0, "ra": 665.0, "win_pct": 0.611, "pyth": 0.616}, {"team_name": "Milwaukee Brewers", "season": 2023, "w": 92.0, "l": 70.0, "rs": 728.0, "ra": 647.0, "win_pct": 0.568, "pyth": 0.554}, {"team_name": "Houston Astros", "season": 2023, "w": 90.0, "l": 72.0, "rs": 827.0, "ra": 698.0, "win_pct": 0.556, "pyth": 0.577}, {"team_name": "Philadelphia Phillies", "season": 2023, "w": 90.0, "l": 72.0, "rs": 796.0, "ra": 715.0, "win_pct": 0.556, "pyth": 0.549}, {"team_name": "Texas Rangers", "season": 2023, "w": 90.0, "l": 72.0, "rs": 881.0, "ra": 716.0, "win_pct": 0.556, "pyth": 0.594}, {"team_name": "Toronto Blue Jays", "season": 2023, "w": 89.0, "l": 73.0, "rs": 746.0, "ra": 671.0, "win_pct": 0.549, "pyth": 0.548}, {"team_name": "Seattle Mariners", "season": 2023, "w": 88.0, "l": 74.0, "rs": 758.0, "ra": 659.0, "win_pct": 0.543, "pyth": 0.564}, {"team_name": "Minnesota Twins", "season": 2023, "w": 87.0, "l": 75.0, "rs": 778.0, "ra": 659.0, "win_pct": 0.537, "pyth": 0.575}, {"team_name": "Miami Marlins", "season": 2023, "w": 84.0, "l": 77.0, "rs": 666.0, "ra": 722.0, "win_pct": 0.522, "pyth": 0.463}, {"team_name": "Arizona Diamondbacks", "season": 2023, "w": 84.0, "l": 78.0, "rs": 746.0, "ra": 761.0, "win_pct": 0.519, "pyth": 0.491}, {"team_name": "Chicago Cubs", "season": 2023, "w": 83.0, "l": 79.0, "rs": 819.0, "ra": 723.0, "win_pct": 0.512, "pyth": 0.557}, {"team_name": "New York Yankees", "season": 2023, "w": 82.0, "l": 80.0, "rs": 673.0, "ra": 698.0, "win_pct": 0.506, "pyth": 0.483}, {"team_name": "Cincinnati Reds", "season": 2023, "w": 82.0, "l": 80.0, "rs": 783.0, "ra": 821.0, "win_pct": 0.506, "pyth": 0.478}, {"team_name": "San Diego Padres", "season": 2023, "w": 82.0, "l": 80.0, "rs": 752.0, "ra": 648.0, "win_pct": 0.506, "pyth": 0.568}, {"team_name": "San Francisco Giants", "season": 2023, "w": 79.0, "l": 83.0, "rs": 674.0, "ra": 719.0, "win_pct": 0.488, "pyth": 0.47}, {"team_name": "Boston Red Sox", "season": 2023, "w": 78.0, "l": 83.0, "rs": 770.0, "ra": 773.0, "win_pct": 0.484, "pyth": 0.498}, {"team_name": "Detroit Tigers", "season": 2023, "w": 78.0, "l": 84.0, "rs": 661.0, "ra": 740.0, "win_pct": 0.481, "pyth": 0.449}, {"team_name": "Cleveland Guardians", "season": 2023, "w": 76.0, "l": 86.0, "rs": 662.0, "ra": 697.0, "win_pct": 0.469, "pyth": 0.476}, {"team_name": "Pittsburgh Pirates", "season": 2023, "w": 76.0, "l": 86.0, "rs": 692.0, "ra": 790.0, "win_pct": 0.469, "pyth": 0.44}, {"team_name": "New York Mets", "season": 2023, "w": 74.0, "l": 86.0, "rs": 716.0, "ra": 725.0, "win_pct": 0.463, "pyth": 0.494}, {"team_name": "Los Angeles Angels", "season": 2023, "w": 73.0, "l": 89.0, "rs": 739.0, "ra": 829.0, "win_pct": 0.451, "pyth": 0.448}, {"team_name": "St. Louis Cardinals", "season": 2023, "w": 71.0, "l": 91.0, "rs": 719.0, "ra": 829.0, "win_pct": 0.438, "pyth": 0.435}, {"team_name": "Washington Nationals", "season": 2023, "w": 71.0, "l": 91.0, "rs": 700.0, "ra": 845.0, "win_pct": 0.438, "pyth": 0.415}, {"team_name": "Chicago White Sox", "season": 2023, "w": 60.0, "l": 101.0, "rs": 638.0, "ra": 839.0, "win_pct": 0.373, "pyth": 0.377}, {"team_name": "Colorado Rockies", "season": 2023, "w": 59.0, "l": 103.0, "rs": 721.0, "ra": 957.0, "win_pct": 0.364, "pyth": 0.373}, {"team_name": "Kansas City Royals", "season": 2023, "w": 56.0, "l": 106.0, "rs": 676.0, "ra": 859.0, "win_pct": 0.346, "pyth": 0.392}, {"team_name": "Oakland Athletics", "season": 2023, "w": 50.0, "l": 112.0, "rs": 585.0, "ra": 924.0, "win_pct": 0.309, "pyth": 0.302}, {"team_name": "Los Angeles Dodgers", "season": 2024, "w": 98.0, "l": 64.0, "rs": 842.0, "ra": 686.0, "win_pct": 0.605, "pyth": 0.593}, {"team_name": "Philadelphia Phillies", "season": 2024, "w": 95.0, "l": 67.0, "rs": 784.0, "ra": 671.0, "win_pct": 0.586, "pyth": 0.571}, {"team_name": "New York Yankees", "season": 2024, "w": 93.0, "l": 68.0, "rs": 810.0, "ra": 666.0, "win_pct": 0.578, "pyth": 0.589}, {"team_name": "Milwaukee Brewers", "season": 2024, "w": 93.0, "l": 69.0, "rs": 777.0, "ra": 641.0, "win_pct": 0.574, "pyth": 0.587}, {"team_name": "San Diego Padres", "season": 2024, "w": 93.0, "l": 69.0, "rs": 760.0, "ra": 669.0, "win_pct": 0.574, "pyth": 0.558}, {"team_name": "Cleveland Guardians", "season": 2024, "w": 92.0, "l": 69.0, "rs": 708.0, "ra": 621.0, "win_pct": 0.571, "pyth": 0.56}, {"team_name": "Baltimore Orioles", "season": 2024, "w": 91.0, "l": 71.0, "rs": 786.0, "ra": 699.0, "win_pct": 0.562, "pyth": 0.553}, {"team_name": "Arizona Diamondbacks", "season": 2024, "w": 89.0, "l": 73.0, "rs": 886.0, "ra": 788.0, "win_pct": 0.549, "pyth": 0.553}, {"team_name": "New York Mets", "season": 2024, "w": 89.0, "l": 73.0, "rs": 768.0, "ra": 697.0, "win_pct": 0.549, "pyth": 0.544}, {"team_name": "Houston Astros", "season": 2024, "w": 88.0, "l": 73.0, "rs": 740.0, "ra": 649.0, "win_pct": 0.547, "pyth": 0.56}, {"team_name": "Atlanta Braves", "season": 2024, "w": 88.0, "l": 73.0, "rs": 695.0, "ra": 607.0, "win_pct": 0.547, "pyth": 0.562}, {"team_name": "Detroit Tigers", "season": 2024, "w": 86.0, "l": 74.0, "rs": 677.0, "ra": 625.0, "win_pct": 0.538, "pyth": 0.536}, {"team_name": "Kansas City Royals", "season": 2024, "w": 85.0, "l": 76.0, "rs": 733.0, "ra": 643.0, "win_pct": 0.528, "pyth": 0.56}, {"team_name": "Seattle Mariners", "season": 2024, "w": 85.0, "l": 77.0, "rs": 676.0, "ra": 607.0, "win_pct": 0.525, "pyth": 0.549}, {"team_name": "Chicago Cubs", "season": 2024, "w": 83.0, "l": 79.0, "rs": 736.0, "ra": 669.0, "win_pct": 0.512, "pyth": 0.544}, {"team_name": "St. Louis Cardinals", "season": 2024, "w": 83.0, "l": 79.0, "rs": 672.0, "ra": 719.0, "win_pct": 0.512, "pyth": 0.469}, {"team_name": "Minnesota Twins", "season": 2024, "w": 81.0, "l": 80.0, "rs": 730.0, "ra": 732.0, "win_pct": 0.503, "pyth": 0.499}, {"team_name": "Boston Red Sox", "season": 2024, "w": 81.0, "l": 81.0, "rs": 751.0, "ra": 747.0, "win_pct": 0.5, "pyth": 0.502}, {"team_name": "San Francisco Giants", "season": 2024, "w": 80.0, "l": 82.0, "rs": 693.0, "ra": 699.0, "win_pct": 0.494, "pyth": 0.496}, {"team_name": "Tampa Bay Rays", "season": 2024, "w": 80.0, "l": 82.0, "rs": 604.0, "ra": 663.0, "win_pct": 0.494, "pyth": 0.457}, {"team_name": "Texas Rangers", "season": 2024, "w": 78.0, "l": 84.0, "rs": 683.0, "ra": 738.0, "win_pct": 0.481, "pyth": 0.465}, {"team_name": "Cincinnati Reds", "season": 2024, "w": 77.0, "l": 85.0, "rs": 699.0, "ra": 694.0, "win_pct": 0.475, "pyth": 0.503}, {"team_name": "Pittsburgh Pirates", "season": 2024, "w": 76.0, "l": 86.0, "rs": 665.0, "ra": 739.0, "win_pct": 0.469, "pyth": 0.452}, {"team_name": "Toronto Blue Jays", "season": 2024, "w": 74.0, "l": 87.0, "rs": 670.0, "ra": 741.0, "win_pct": 0.46, "pyth": 0.454}, {"team_name": "Washington Nationals", "season": 2024, "w": 71.0, "l": 91.0, "rs": 660.0, "ra": 764.0, "win_pct": 0.438, "pyth": 0.433}, {"team_name": "Oakland Athletics", "season": 2024, "w": 69.0, "l": 93.0, "rs": 643.0, "ra": 764.0, "win_pct": 0.426, "pyth": 0.422}, {"team_name": "Los Angeles Angels", "season": 2024, "w": 63.0, "l": 99.0, "rs": 635.0, "ra": 797.0, "win_pct": 0.389, "pyth": 0.398}, {"team_name": "Miami Marlins", "season": 2024, "w": 62.0, "l": 100.0, "rs": 637.0, "ra": 841.0, "win_pct": 0.383, "pyth": 0.376}, {"team_name": "Colorado Rockies", "season": 2024, "w": 61.0, "l": 101.0, "rs": 682.0, "ra": 929.0, "win_pct": 0.377, "pyth": 0.362}, {"team_name": "Chicago White Sox", "season": 2024, "w": 41.0, "l": 120.0, "rs": 507.0, "ra": 804.0, "win_pct": 0.255, "pyth": 0.301}, {"team_name": "Milwaukee Brewers", "season": 2025, "w": 97.0, "l": 65.0, "rs": 806.0, "ra": 634.0, "win_pct": 0.599, "pyth": 0.608}, {"team_name": "Philadelphia Phillies", "season": 2025, "w": 96.0, "l": 66.0, "rs": 778.0, "ra": 648.0, "win_pct": 0.593, "pyth": 0.583}, {"team_name": "New York Yankees", "season": 2025, "w": 94.0, "l": 67.0, "rs": 848.0, "ra": 676.0, "win_pct": 0.584, "pyth": 0.602}, {"team_name": "Toronto Blue Jays", "season": 2025, "w": 93.0, "l": 68.0, "rs": 792.0, "ra": 720.0, "win_pct": 0.578, "pyth": 0.543}, {"team_name": "Los Angeles Dodgers", "season": 2025, "w": 93.0, "l": 69.0, "rs": 825.0, "ra": 683.0, "win_pct": 0.574, "pyth": 0.586}, {"team_name": "Chicago Cubs", "season": 2025, "w": 92.0, "l": 70.0, "rs": 793.0, "ra": 649.0, "win_pct": 0.568, "pyth": 0.591}, {"team_name": "Seattle Mariners", "season": 2025, "w": 90.0, "l": 72.0, "rs": 766.0, "ra": 694.0, "win_pct": 0.556, "pyth": 0.545}, {"team_name": "San Diego Padres", "season": 2025, "w": 90.0, "l": 72.0, "rs": 702.0, "ra": 621.0, "win_pct": 0.556, "pyth": 0.556}, {"team_name": "Boston Red Sox", "season": 2025, "w": 89.0, "l": 73.0, "rs": 786.0, "ra": 676.0, "win_pct": 0.549, "pyth": 0.569}, {"team_name": "Cleveland Guardians", "season": 2025, "w": 88.0, "l": 74.0, "rs": 643.0, "ra": 649.0, "win_pct": 0.543, "pyth": 0.496}, {"team_name": "Houston Astros", "season": 2025, "w": 87.0, "l": 74.0, "rs": 682.0, "ra": 660.0, "win_pct": 0.54, "pyth": 0.515}, {"team_name": "Detroit Tigers", "season": 2025, "w": 87.0, "l": 75.0, "rs": 758.0, "ra": 691.0, "win_pct": 0.537, "pyth": 0.542}, {"team_name": "New York Mets", "season": 2025, "w": 83.0, "l": 79.0, "rs": 766.0, "ra": 715.0, "win_pct": 0.512, "pyth": 0.531}, {"team_name": "Cincinnati Reds", "season": 2025, "w": 82.0, "l": 79.0, "rs": 712.0, "ra": 679.0, "win_pct": 0.509, "pyth": 0.522}, {"team_name": "Kansas City Royals", "season": 2025, "w": 82.0, "l": 80.0, "rs": 651.0, "ra": 637.0, "win_pct": 0.506, "pyth": 0.51}, {"team_name": "Texas Rangers", "season": 2025, "w": 81.0, "l": 81.0, "rs": 684.0, "ra": 605.0, "win_pct": 0.5, "pyth": 0.556}, {"team_name": "San Francisco Giants", "season": 2025, "w": 80.0, "l": 81.0, "rs": 696.0, "ra": 683.0, "win_pct": 0.497, "pyth": 0.509}, {"team_name": "Arizona Diamondbacks", "season": 2025, "w": 80.0, "l": 82.0, "rs": 791.0, "ra": 785.0, "win_pct": 0.494, "pyth": 0.503}, {"team_name": "Miami Marlins", "season": 2025, "w": 79.0, "l": 83.0, "rs": 709.0, "ra": 798.0, "win_pct": 0.488, "pyth": 0.446}, {"team_name": "St. Louis Cardinals", "season": 2025, "w": 78.0, "l": 84.0, "rs": 689.0, "ra": 754.0, "win_pct": 0.481, "pyth": 0.459}, {"team_name": "Tampa Bay Rays", "season": 2025, "w": 77.0, "l": 85.0, "rs": 714.0, "ra": 683.0, "win_pct": 0.475, "pyth": 0.52}, {"team_name": "Atlanta Braves", "season": 2025, "w": 76.0, "l": 86.0, "rs": 724.0, "ra": 734.0, "win_pct": 0.469, "pyth": 0.494}, {"team_name": "Oakland Athletics", "season": 2025, "w": 76.0, "l": 86.0, "rs": 733.0, "ra": 817.0, "win_pct": 0.469, "pyth": 0.451}, {"team_name": "Baltimore Orioles", "season": 2025, "w": 75.0, "l": 87.0, "rs": 677.0, "ra": 788.0, "win_pct": 0.463, "pyth": 0.431}, {"team_name": "Los Angeles Angels", "season": 2025, "w": 72.0, "l": 90.0, "rs": 673.0, "ra": 837.0, "win_pct": 0.444, "pyth": 0.402}, {"team_name": "Minnesota Twins", "season": 2025, "w": 70.0, "l": 90.0, "rs": 676.0, "ra": 766.0, "win_pct": 0.438, "pyth": 0.443}, {"team_name": "Pittsburgh Pirates", "season": 2025, "w": 71.0, "l": 91.0, "rs": 583.0, "ra": 645.0, "win_pct": 0.438, "pyth": 0.454}, {"team_name": "Washington Nationals", "season": 2025, "w": 66.0, "l": 96.0, "rs": 687.0, "ra": 899.0, "win_pct": 0.407, "pyth": 0.379}, {"team_name": "Chicago White Sox", "season": 2025, "w": 58.0, "l": 101.0, "rs": 638.0, "ra": 732.0, "win_pct": 0.365, "pyth": 0.437}, {"team_name": "Colorado Rockies", "season": 2025, "w": 43.0, "l": 119.0, "rs": 597.0, "ra": 1021.0, "win_pct": 0.265, "pyth": 0.272}];
+const seasons=[...new Set(TEAMS.map(t=>t.season))].sort();
+const selS=document.getElementById('season'),selA=document.getElementById('ta'),selB=document.getElementById('tb');
+seasons.forEach(s=>selS.add(new Option(s,s))); selS.value=seasons[seasons.length-1];
+function fillTeams(){ const s=+selS.value; const names=TEAMS.filter(t=>t.season===s).map(t=>t.team_name).sort();
+  [selA,selB].forEach(sel=>{ const cur=sel.value; sel.innerHTML=''; names.forEach(n=>sel.add(new Option(n,n))); if(names.includes(cur)) sel.value=cur; });
+  selA.value=names[0]; selB.value=names[1]; }
+const ROWS=[['win_pct','Win %',3,true],['w','Wins',0,true],['rs','Runs scored',0,true],
+  ['ra','Runs allowed',0,false],['pyth','Pythagorean win %',3,true]];
+function row(a,b,label,dec,hi){ const av=a,bv=b, max=Math.max(av,bv)||1;
+  const aw=(av/max*100).toFixed(0), bw=(bv/max*100).toFixed(0);
+  const awin=hi?av>=bv:av<=bv;
+  const ac=awin?'var(--a)':'var(--sub)', bc=!awin?'var(--a)':'var(--sub)';
+  const f=v=>dec?v.toFixed(dec):v;
+  return `<div class="cmp"><div class="lab">${label}</div>
+    <div class="bar"><div class="fill r" style="width:${aw}%;background:linear-gradient(270deg,${ac},var(--panel2));"></div><div class="v" style="left:8px;">${f(av)}</div></div>
+    <div class="mid">${awin?'◀':(av===bv?'=':'▶')}</div>
+    <div class="bar"><div class="fill l" style="width:${bw}%;background:linear-gradient(90deg,${bc},var(--panel2));"></div><div class="v" style="right:8px;">${f(bv)}</div></div></div>`; }
+function render(){ const s=+selS.value;
+  const A=TEAMS.find(t=>t.season===s&&t.team_name===selA.value);
+  const B=TEAMS.find(t=>t.season===s&&t.team_name===selB.value);
+  if(!A||!B){document.getElementById('body').innerHTML='';return;}
+  const diff=t=>t.rs-t.ra;
+  let h=`<div class="card"><div class="cmp"><div class="lab" style="font:400 20px 'Anton';color:var(--text);">${A.team_name} (${A.w}-${A.l}) &nbsp; vs &nbsp; ${B.team_name} (${B.w}-${B.l})</div></div>`;
+  ROWS.forEach(r=>{h+=row(A[r[0]],B[r[0]],r[1],r[2],r[3]);});
+  h+=row(diff(A),diff(B),'Run differential',0,true);
+  h+='</div>'; document.getElementById('body').innerHTML=h; }
+[selS,selA,selB].forEach(el=>el.addEventListener('change',()=>{if(el===selS)fillTeams();render();}));
+fillTeams(); render();
+</script>
+</div></body></html>

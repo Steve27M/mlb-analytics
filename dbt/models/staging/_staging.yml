@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: stg_statcast__pitches
+    description: "GRAIN: one row per pitch (pitch_key)."
+    columns:
+      - name: pitch_key
+        tests: [not_null, unique]
+      - name: game_pk
+        tests: [not_null]
+      - name: batter_id
+        tests: [not_null]
+      - name: pitcher_id
+        tests: [not_null]
+
+  - name: stg_statsapi__schedule
+    description: "GRAIN: one row per game (game_pk). Suspended games deduped to completion date."
+    columns:
+      - name: game_pk
+        tests: [not_null, unique]
+      - name: season
+        tests:
+          - accepted_values:
+              values: [2023, 2024, 2025]
+      - name: game_type
+        tests:
+          - accepted_values:
+              values: ["R", "F", "D", "L", "W"]
+
+  - name: stg_statsapi__boxscore
+    description: "GRAIN: one row per team per game (game_pk, team_id)."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_pk, team_id]
+    columns:
+      - name: game_pk
+        tests: [not_null]
+      - name: team_id
+        tests: [not_null]
+
+  - name: stg_chadwick__players
+    description: "GRAIN: one row per MLBAM player id (player_id). -1 sentinel removed."
+    columns:
+      - name: player_id
+        tests: [not_null, unique]

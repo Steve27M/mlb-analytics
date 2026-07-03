@@ -1,0 +1,29 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: >
+      Raw source shapes landed from date-partitioned Parquet by ingest/land.py. MLBAM ids are
+      already BIGINT. dbt reads these read-only; it never writes bronze.
+    schema: bronze
+    tables:
+      - name: statcast
+        description: One row per pitch (Baseball Savant). game_pk/batter/pitcher are BIGINT.
+        columns:
+          - name: pitch_key
+            description: sha1(game_pk, at_bat_number, pitch_number) — deterministic pitch grain.
+            tests: [not_null, unique]
+      - name: statsapi_schedule
+        description: >
+          One row per (game_pk, game_date). Suspended games appear under >1 date — staging
+          collapses to one row per game_pk.
+      - name: statsapi_boxscore
+        description: >
+          One row per (game_pk, team_id, game_date) — team-game lines. Suspended games
+          duplicate across dates; staging dedupes to one row per (game_pk, team_id).
+      - name: chadwick_register
+        description: Player-id crosswalk (ODC-By 1.0). key_mlbam = -1 is a "no MLBAM id" sentinel.
+      - name: people
+        description: Player birth years from statsapi /sports/1/players (for B3 aging).
+      - name: draft
+        description: MLB draft first-round picks from Wikipedia (CC BY-SA; M8).

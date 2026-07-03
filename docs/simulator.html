@@ -1,0 +1,148 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DIAMONDIQ — Season Simulator</title><meta name="description" content="Monte-Carlo playoff odds: 10,000 simulated 2025 seasons driven by the game model's leakage-safe per-game win probabilities over the real schedule.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Saira+Condensed:wght@600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
+:root{
+  --a:#ef4b4b; --a2:#9e1f1f; --aText:#1a0505;
+  --bg:#08090c; --text:#f4f6fb; --sub:#8a94a6; --border:rgba(255,255,255,.09);
+  --panel:#13161e; --panel2:#0c0e14; --good:#3ddc84; --bad:#ff6b6b; --gold:#ffd166;
+}
+*{box-sizing:border-box;} html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;
+  background:radial-gradient(140% 55% at 50% 0%,color-mix(in srgb,var(--a) 14%,var(--bg)) 0%,var(--bg) 52%);
+  background-attachment:fixed;padding-bottom:70px;}
+a{color:inherit;text-decoration:none;}
+::-webkit-scrollbar{width:11px;height:11px;} ::-webkit-scrollbar-track{background:#0c0e13;}
+::-webkit-scrollbar-thumb{background:#242833;border-radius:6px;}
+.wrap{max-width:1120px;margin:0 auto;padding:0 26px;}
+.nav{position:sticky;top:0;z-index:40;backdrop-filter:blur(14px);background:rgba(8,9,13,.82);border-bottom:1px solid var(--border);}
+.nav .in{display:flex;align-items:center;gap:20px;padding:12px 26px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:9px;}
+.brand .bar{width:9px;height:26px;border-radius:3px;background:linear-gradient(var(--a),var(--a2));}
+.brand .txt{font:800 15px 'Saira Condensed';letter-spacing:.14em;}
+.navlinks{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto;}
+.navlinks a{font:600 12px 'Space Grotesk';letter-spacing:.04em;color:var(--sub);padding:7px 12px;border-radius:8px;}
+.navlinks a:hover{color:var(--text);background:var(--panel);}
+.navlinks a.active{color:var(--aText);background:var(--a);}
+.hero{padding:44px 0 8px;}
+.hero .eyebrow{font:600 12px 'Space Grotesk';letter-spacing:.22em;color:var(--a);text-transform:uppercase;}
+.hero h1{font:400 clamp(40px,6vw,68px)/.92 'Anton';text-transform:uppercase;margin:10px 0 0;}
+.hero p{font:400 16px/1.6 'Space Grotesk';color:var(--sub);max-width:700px;margin:14px 0 0;}
+.sec{display:flex;align-items:center;gap:12px;margin:38px 0 16px;}
+.sec h2{font:400 22px 'Anton';letter-spacing:.02em;text-transform:uppercase;margin:0;}
+.sec .line{flex:1;height:1px;background:var(--border);}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.card{border-radius:16px;border:1px solid var(--border);background:var(--panel);padding:18px 20px;display:flex;flex-direction:column;gap:10px;}
+.card .name{font:400 21px 'Anton';text-transform:uppercase;letter-spacing:.01em;}
+.badge{font:700 10px 'Space Grotesk';letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid var(--border);color:var(--sub);white-space:nowrap;}
+.badge.good{color:var(--aText);background:var(--good);border-color:var(--good);}
+.badge.a{color:var(--aText);background:var(--a);border-color:var(--a);}
+.badge.gold{color:#1a0505;background:var(--gold);border-color:var(--gold);}
+.card .def{font:400 14px/1.6 'Space Grotesk';color:var(--text);}
+.card .read{font:400 13px/1.6 'Space Grotesk';color:var(--sub);border-left:2px solid var(--a);padding-left:12px;}
+.card .read b{color:var(--text);font-weight:600;}
+.stat{font:700 30px 'Saira Condensed';}
+.stat .u{font:600 13px 'Space Grotesk';color:var(--sub);margin-left:6px;}
+.kv{display:flex;justify-content:space-between;font:500 13px 'Space Grotesk';color:var(--sub);padding:3px 0;}
+.kv b{color:var(--text);font:700 13px 'JetBrains Mono';}
+.mono{font-family:'JetBrains Mono';}
+.dist{margin-top:2px;}
+.dist .track{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--panel2),color-mix(in srgb,var(--a) 30%,var(--panel2)));border:1px solid var(--border);}
+.dist .med{position:absolute;top:-3px;width:2px;height:16px;background:var(--text);border-radius:2px;}
+.dist .ends{display:flex;justify-content:space-between;margin-top:7px;font:600 11px 'JetBrains Mono';color:var(--sub);}
+.dist .ex{display:flex;justify-content:space-between;gap:8px;margin-top:9px;font:500 11px 'Space Grotesk';}
+.dist .ex .chip{display:flex;align-items:center;gap:6px;color:var(--sub);}
+.dist .ex .chip b{font:700 12px 'Saira Condensed';color:var(--text);}
+.dist .ex .dot{width:7px;height:7px;border-radius:2px;}
+.toolbar{display:flex;gap:12px;align-items:center;margin:26px 0 6px;flex-wrap:wrap;}
+.search{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:11px 15px;}
+.search input,select{background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font:500 14px 'Space Grotesk';padding:9px 12px;outline:none;}
+.search input{flex:1;border:none;padding:0;background:none;}
+.count{font:600 12px 'JetBrains Mono';color:var(--sub);}
+.empty{grid-column:1/-1;text-align:center;color:var(--sub);font:500 14px 'Space Grotesk';padding:40px;}
+footer{margin-top:44px;font:500 12px/1.7 'Space Grotesk';color:var(--sub);}
+footer a{color:var(--a);}
+.cmp{display:grid;grid-template-columns:1fr 60px 1fr;gap:10px;align-items:center;margin:8px 0;}
+.cmp .lab{grid-column:1/-1;text-align:center;font:600 11px 'Space Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-top:8px;}
+.cmp .bar{height:26px;border-radius:6px;background:var(--panel2);position:relative;overflow:hidden;border:1px solid var(--border);}
+.cmp .fill{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,var(--a2),var(--a));}
+.cmp .fill.r{right:0;} .cmp .fill.l{left:0;}
+.cmp .v{position:absolute;top:5px;font:700 13px 'JetBrains Mono';color:#fff;}
+.cmp .mid{text-align:center;font:600 11px 'Space Grotesk';color:var(--sub);}
+.dhead{font:400 18px 'Anton';text-transform:uppercase;letter-spacing:.02em;color:var(--a);}
+.shdr{display:grid;grid-template-columns:1.3fr .9fr 1.4fr;gap:8px;font:600 10px 'Space Grotesk';letter-spacing:.06em;text-transform:uppercase;color:var(--sub);padding-bottom:4px;border-bottom:1px solid var(--border);}
+.srow{display:grid;grid-template-columns:1.3fr .9fr 1.4fr;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.steam{display:flex;align-items:center;gap:7px;font:700 14px 'Saira Condensed';}
+.steam .srec{font:500 11px 'JetBrains Mono';color:var(--sub);}
+.pdot{width:8px;height:8px;border-radius:2px;background:var(--gold);flex:none;}
+.pdot.off{background:rgba(255,255,255,.12);}
+.sproj{font:700 16px 'JetBrains Mono';display:flex;flex-direction:column;line-height:1.1;}
+.sproj .srange{font:500 10px 'JetBrains Mono';color:var(--sub);}
+.obar{position:relative;height:18px;border-radius:5px;background:var(--panel2);border:1px solid var(--border);overflow:hidden;}
+.obar .ofill{position:absolute;top:0;bottom:0;left:0;}
+.obar .oval{position:absolute;right:6px;top:2px;font:700 11px 'JetBrains Mono';color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);}
+@media(max-width:760px){.grid,.grid3{grid-template-columns:1fr;}}
+</style></head><body><div class="nav"><div class="in">
+  <a class="brand" href="index.html"><span class="bar"></span><span class="txt">DIAMOND<span style="color:var(--a);">IQ</span></span></a>
+  <div class="navlinks">
+    <a href="compare.html">Compare Teams</a>
+    <a href="simulator.html" class="active">Season Sim</a>
+    <a href="glossary.html">Stat Guide</a>
+    <a href="models.html">The Models</a>
+    <a href="index.html">Dashboard</a>
+    <a href="https://github.com/Steve27M/mlb-analytics" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</div></div><div class="wrap"><div class="hero"><div class="eyebrow">Monte Carlo</div><h1>Season Simulator</h1>
+      <p>Ten thousand simulated 2025 seasons. Every one of the 2,271 regular-season
+      games is a weighted coin-flip using the <b>game model's</b> pre-game win probability
+      (leakage-safe — it never sees the result), and we tally wins, division titles, and playoff
+      berths. This is a rollup of the parity-gated game model, not a new model.</p></div>
+      <div class="grid3">
+        <div class="card"><div class="kv"><span>Projected vs. actual wins</span></div>
+          <div class="stat">0.91<span class="u">r</span></div>
+          <div class="read">Rank-order recovery of the real standings from forecast alone.</div></div>
+        <div class="card"><div class="kv"><span>Playoff field identified</span></div>
+          <div class="stat">10<span class="u">/ 12</span></div>
+          <div class="read">Of the 12 highest-odds teams, how many actually reached October.</div></div>
+        <div class="card"><div class="kv"><span>Seasons simulated</span></div>
+          <div class="stat">10<span class="u">K</span></div>
+          <div class="read">Fixed seed → the page is reproducible. Gold dot = made playoffs in 2025.</div></div>
+      </div>
+      <div class="card" style="margin-top:16px;border-color:var(--gold);">
+        <div class="read" style="border-color:var(--gold);"><b>Read it honestly:</b> projected win
+        totals compress toward .500 because the game model is deliberately conservative — MLB games
+        really are near coin-flips (AUC ~0.55). So even a weak team keeps some playoff hope and the
+        best teams don't run away. The <b>ordering</b>, though, tracks reality closely (r =
+        0.91). That gap between "confident spread" and "correct ranking" is
+        the point.</div></div>
+      <div id="body" style="margin-top:8px;"></div><footer>
+  Built from the <a href="https://github.com/Steve27M/mlb-analytics">mlb-analytics</a> warehouse (2,184,101 pitches,
+  2023–2025). Data: MLB Advanced Media
+  (statsapi / Baseball Savant) — individual, non-commercial, non-bulk use; raw data not
+  redistributed. Player crosswalk: Chadwick Bureau (ODC-By). Draft: Wikipedia (CC BY-SA).
+  Aggregates and code only.
+</footer><script>const SIM={"n_sim": 10000, "seed": 777, "n_games": 2271, "corr_proj_actual": 0.91, "top12_playoff_hits": 10, "teams": [{"team_id": 158, "abbr": "MIL", "name": "Milwaukee Brewers", "league": "NL", "division": "Central", "actual_w": 97, "actual_l": 65, "proj_wins": 79.7, "p10": 72.0, "p90": 87.0, "playoff_odds": 0.655, "div_odds": 0.385, "made_playoffs_actual": true}, {"team_id": 147, "abbr": "NYY", "name": "New York Yankees", "league": "AL", "division": "East", "actual_w": 94, "actual_l": 67, "proj_wins": 78.7, "p10": 71.0, "p90": 86.0, "playoff_odds": 0.602, "div_odds": 0.27, "made_playoffs_actual": true}, {"team_id": 111, "abbr": "BOS", "name": "Boston Red Sox", "league": "AL", "division": "East", "actual_w": 89, "actual_l": 73, "proj_wins": 78.4, "p10": 71.0, "p90": 86.0, "playoff_odds": 0.585, "div_odds": 0.268, "made_playoffs_actual": true}, {"team_id": 141, "abbr": "TOR", "name": "Toronto Blue Jays", "league": "AL", "division": "East", "actual_w": 93, "actual_l": 68, "proj_wins": 78.5, "p10": 71.0, "p90": 86.0, "playoff_odds": 0.571, "div_odds": 0.238, "made_playoffs_actual": true}, {"team_id": 143, "abbr": "PHI", "name": "Philadelphia Phillies", "league": "NL", "division": "East", "actual_w": 96, "actual_l": 66, "proj_wins": 78.2, "p10": 70.0, "p90": 86.0, "playoff_odds": 0.565, "div_odds": 0.298, "made_playoffs_actual": true}, {"team_id": 116, "abbr": "DET", "name": "Detroit Tigers", "league": "AL", "division": "Central", "actual_w": 87, "actual_l": 75, "proj_wins": 77.3, "p10": 69.0, "p90": 85.0, "playoff_odds": 0.503, "div_odds": 0.338, "made_playoffs_actual": true}, {"team_id": 121, "abbr": "NYM", "name": "New York Mets", "league": "NL", "division": "East", "actual_w": 83, "actual_l": 79, "proj_wins": 77.1, "p10": 69.0, "p90": 85.0, "playoff_odds": 0.501, "div_odds": 0.248, "made_playoffs_actual": true}, {"team_id": 112, "abbr": "CHC", "name": "Chicago Cubs", "league": "NL", "division": "Central", "actual_w": 92, "actual_l": 70, "proj_wins": 77.3, "p10": 69.0, "p90": 85.0, "playoff_odds": 0.501, "div_odds": 0.266, "made_playoffs_actual": true}, {"team_id": 135, "abbr": "SD", "name": "San Diego Padres", "league": "NL", "division": "West", "actual_w": 90, "actual_l": 72, "proj_wins": 77.3, "p10": 69.0, "p90": 85.0, "playoff_odds": 0.478, "div_odds": 0.274, "made_playoffs_actual": true}, {"team_id": 144, "abbr": "ATL", "name": "Atlanta Braves", "league": "NL", "division": "East", "actual_w": 76, "actual_l": 86, "proj_wins": 76.3, "p10": 69.0, "p90": 84.0, "playoff_odds": 0.452, "div_odds": 0.23, "made_playoffs_actual": false}, {"team_id": 136, "abbr": "SEA", "name": "Seattle Mariners", "league": "AL", "division": "West", "actual_w": 90, "actual_l": 72, "proj_wins": 76.9, "p10": 69.0, "p90": 85.0, "playoff_odds": 0.451, "div_odds": 0.257, "made_playoffs_actual": true}, {"team_id": 109, "abbr": "ARI", "name": "Arizona Diamondbacks", "league": "NL", "division": "West", "actual_w": 80, "actual_l": 82, "proj_wins": 76.5, "p10": 68.0, "p90": 84.0, "playoff_odds": 0.439, "div_odds": 0.248, "made_playoffs_actual": false}, {"team_id": 119, "abbr": "LAD", "name": "Los Angeles Dodgers", "league": "NL", "division": "West", "actual_w": 93, "actual_l": 69, "proj_wins": 76.7, "p10": 69.0, "p90": 84.0, "playoff_odds": 0.437, "div_odds": 0.245, "made_playoffs_actual": true}, {"team_id": 114, "abbr": "CLE", "name": "Cleveland Guardians", "league": "AL", "division": "Central", "actual_w": 88, "actual_l": 74, "proj_wins": 75.6, "p10": 68.0, "p90": 83.0, "playoff_odds": 0.408, "div_odds": 0.248, "made_playoffs_actual": true}, {"team_id": 139, "abbr": "TB", "name": "Tampa Bay Rays", "league": "AL", "division": "East", "actual_w": 77, "actual_l": 85, "proj_wins": 75.7, "p10": 68.0, "p90": 84.0, "playoff_odds": 0.393, "div_odds": 0.126, "made_playoffs_actual": false}, {"team_id": 133, "abbr": "ATH", "name": "Oakland Athletics", "league": "AL", "division": "West", "actual_w": 76, "actual_l": 86, "proj_wins": 75.9, "p10": 68.0, "p90": 84.0, "playoff_odds": 0.39, "div_odds": 0.221, "made_playoffs_actual": false}, {"team_id": 137, "abbr": "SF", "name": "San Francisco Giants", "league": "NL", "division": "West", "actual_w": 80, "actual_l": 81, "proj_wins": 75.9, "p10": 68.0, "p90": 84.0, "playoff_odds": 0.379, "div_odds": 0.187, "made_playoffs_actual": false}, {"team_id": 117, "abbr": "HOU", "name": "Houston Astros", "league": "AL", "division": "West", "actual_w": 87, "actual_l": 74, "proj_wins": 75.3, "p10": 67.0, "p90": 83.0, "playoff_odds": 0.361, "div_odds": 0.209, "made_playoffs_actual": false}, {"team_id": 113, "abbr": "CIN", "name": "Cincinnati Reds", "league": "NL", "division": "Central", "actual_w": 82, "actual_l": 79, "proj_wins": 75.2, "p10": 67.0, "p90": 83.0, "playoff_odds": 0.36, "div_odds": 0.153, "made_playoffs_actual": false}, {"team_id": 146, "abbr": "MIA", "name": "Miami Marlins", "league": "NL", "division": "East", "actual_w": 79, "actual_l": 83, "proj_wins": 74.3, "p10": 66.0, "p90": 82.0, "playoff_odds": 0.331, "div_odds": 0.133, "made_playoffs_actual": false}, {"team_id": 140, "abbr": "TEX", "name": "Texas Rangers", "league": "AL", "division": "West", "actual_w": 81, "actual_l": 81, "proj_wins": 75.1, "p10": 67.0, "p90": 83.0, "playoff_odds": 0.33, "div_odds": 0.161, "made_playoffs_actual": false}, {"team_id": 110, "abbr": "BAL", "name": "Baltimore Orioles", "league": "AL", "division": "East", "actual_w": 75, "actual_l": 87, "proj_wins": 74.3, "p10": 66.0, "p90": 82.0, "playoff_odds": 0.325, "div_odds": 0.098, "made_playoffs_actual": false}, {"team_id": 138, "abbr": "STL", "name": "St. Louis Cardinals", "league": "NL", "division": "Central", "actual_w": 78, "actual_l": 84, "proj_wins": 74.7, "p10": 67.0, "p90": 83.0, "playoff_odds": 0.315, "div_odds": 0.121, "made_playoffs_actual": false}, {"team_id": 118, "abbr": "KC", "name": "Kansas City Royals", "league": "AL", "division": "Central", "actual_w": 82, "actual_l": 80, "proj_wins": 74.2, "p10": 66.0, "p90": 82.0, "playoff_odds": 0.303, "div_odds": 0.158, "made_playoffs_actual": false}, {"team_id": 108, "abbr": "LAA", "name": "Los Angeles Angels", "league": "AL", "division": "West", "actual_w": 72, "actual_l": 90, "proj_wins": 74.0, "p10": 66.0, "p90": 82.0, "playoff_odds": 0.288, "div_odds": 0.152, "made_playoffs_actual": false}, {"team_id": 142, "abbr": "MIN", "name": "Minnesota Twins", "league": "AL", "division": "Central", "actual_w": 70, "actual_l": 90, "proj_wins": 73.8, "p10": 66.0, "p90": 82.0, "playoff_odds": 0.283, "div_odds": 0.144, "made_playoffs_actual": false}, {"team_id": 120, "abbr": "WSH", "name": "Washington Nationals", "league": "NL", "division": "East", "actual_w": 66, "actual_l": 96, "proj_wins": 73.4, "p10": 66.0, "p90": 81.0, "playoff_odds": 0.261, "div_odds": 0.09, "made_playoffs_actual": false}, {"team_id": 134, "abbr": "PIT", "name": "Pittsburgh Pirates", "league": "NL", "division": "Central", "actual_w": 71, "actual_l": 91, "proj_wins": 72.7, "p10": 65.0, "p90": 81.0, "playoff_odds": 0.216, "div_odds": 0.075, "made_playoffs_actual": false}, {"team_id": 145, "abbr": "CWS", "name": "Chicago White Sox", "league": "AL", "division": "Central", "actual_w": 58, "actual_l": 101, "proj_wins": 72.1, "p10": 64.0, "p90": 80.0, "playoff_odds": 0.208, "div_odds": 0.113, "made_playoffs_actual": false}, {"team_id": 115, "abbr": "COL", "name": "Colorado Rockies", "league": "NL", "division": "West", "actual_w": 43, "actual_l": 119, "proj_wins": 69.9, "p10": 62.0, "p90": 78.0, "playoff_odds": 0.11, "div_odds": 0.046, "made_playoffs_actual": false}]};
+const DIVS=['East','Central','West'];
+function bar(pct,col){ return `<div class="obar"><div class="ofill" style="width:${(pct*100).toFixed(0)}%;background:${col};"></div><span class="oval">${(pct*100).toFixed(0)}%</span></div>`; }
+function teamRow(t){ const dot=t.made_playoffs_actual?'<span class="pdot"></span>':'<span class="pdot off"></span>';
+  return `<div class="srow"><div class="steam">${dot}<b>${t.abbr}</b><span class="srec">${t.actual_w}-${t.actual_l}</span></div>
+    <div class="sproj">${t.proj_wins}<span class="srange">${t.p10}–${t.p90}</span></div>
+    ${bar(t.playoff_odds,'linear-gradient(90deg,var(--a2),var(--a))')}</div>`; }
+function render(){ let h='';
+  for(const lg of ['AL','NL']){
+    h+=`<div class="sec"><h2>${lg==='AL'?'American':'National'} League</h2><span class="line"></span></div><div class="grid3">`;
+    for(const dv of DIVS){
+      const ts=SIM.teams.filter(t=>t.league===lg&&t.division===dv).sort((a,b)=>b.playoff_odds-a.playoff_odds);
+      h+=`<div class="card"><div class="dhead">${lg} ${dv}</div>
+        <div class="shdr"><span>Team</span><span>Proj W</span><span>Playoff odds</span></div>
+        ${ts.map(teamRow).join('')}</div>`;
+    }
+    h+='</div>';
+  }
+  document.getElementById('body').innerHTML=h; }
+render();
+</script>
+</div></body></html>

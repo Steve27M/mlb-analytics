@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: player_team_daily
+    description: "GRAIN: one row per (player_id, game_date) — the team the player appeared for."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_id, game_date]
+    columns:
+      - name: player_id
+        tests: [not_null]
+      - name: team_id
+        tests: [not_null]
+
+  - name: pa_run_value
+    description: "GRAIN: one PA per complete inning (game_pk, at_bat_number). RE24 run value."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_pk, at_bat_number]

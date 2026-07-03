@@ -1,0 +1,12 @@
+# dbt-duckdb profile. Run dbt from the repo root, e.g.:
+#   uv run dbt build --project-dir dbt --profiles-dir dbt
+# The DuckDB path resolves relative to the repo root (cwd when invoking dbt) and matches
+# MLB_DUCKDB_PATH so land.py and dbt read/write the same warehouse file.
+mlb_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('MLB_DUCKDB_PATH', 'data/warehouse.duckdb') }}"
+      threads: 4
+      extensions: []

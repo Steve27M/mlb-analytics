@@ -1,0 +1,62 @@
+[project]
+name = "mlb-analytics"
+version = "0.1.0"
+description = "Polyglot MLB analytics: statsapi/Savant/Chadwick -> DuckDB -> dbt -> R/Python models -> Quarto dashboard"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # --- pipeline / warehouse ---
+    "duckdb>=1.1",
+    "dbt-duckdb>=1.9",
+    "pyarrow>=17",          # date-partitioned bronze Parquet
+    # --- ingestion (Python owns all API pulls + DuckDB/Parquet I/O) ---
+    "pybaseball>=2.2",      # wraps Baseball Savant / Statcast
+    "requests>=2.32",
+    "tenacity>=9.0",        # exponential backoff on 429/5xx
+    "python-dotenv>=1.0",
+    # --- data / stats / ML (Python side of the parity gate) ---
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "statsmodels>=0.14",    # OLS, GLM (logistic/Poisson), MixedLM
+    "scikit-learn>=1.5",    # PCA, KMeans, parity baselines
+    "matplotlib>=3.9",
+    # --- scraping (M8 Wikipedia, ethical + rate-limited) ---
+    "beautifulsoup4>=4.12",
+    "lxml>=5.3",
+    # --- orchestration CLI ---
+    "typer>=0.12",
+    "rich>=13.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.7",
+    "sqlfluff>=3.2",
+    "mypy>=1.13",
+    "pytest>=8.3",
+]
+
+[tool.uv]
+package = false
+# Repo lives under OneDrive, which can't hardlink into uv's cache; copy instead.
+link-mode = "copy"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["_common"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.0",
+    "sqlfluff-templater-dbt>=4.2.2",
+]

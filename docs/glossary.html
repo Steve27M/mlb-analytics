@@ -1,0 +1,136 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DIAMONDIQ — Stat Guide</title><meta name="description" content="A plain-English data dictionary for every MLB metric on the DIAMONDIQ dashboard.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Saira+Condensed:wght@600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
+:root{
+  --a:#ef4b4b; --a2:#9e1f1f; --aText:#1a0505;
+  --bg:#08090c; --text:#f4f6fb; --sub:#8a94a6; --border:rgba(255,255,255,.09);
+  --panel:#13161e; --panel2:#0c0e14; --good:#3ddc84; --bad:#ff6b6b; --gold:#ffd166;
+}
+*{box-sizing:border-box;} html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;
+  background:radial-gradient(140% 55% at 50% 0%,color-mix(in srgb,var(--a) 14%,var(--bg)) 0%,var(--bg) 52%);
+  background-attachment:fixed;padding-bottom:70px;}
+a{color:inherit;text-decoration:none;}
+::-webkit-scrollbar{width:11px;height:11px;} ::-webkit-scrollbar-track{background:#0c0e13;}
+::-webkit-scrollbar-thumb{background:#242833;border-radius:6px;}
+.wrap{max-width:1120px;margin:0 auto;padding:0 26px;}
+.nav{position:sticky;top:0;z-index:40;backdrop-filter:blur(14px);background:rgba(8,9,13,.82);border-bottom:1px solid var(--border);}
+.nav .in{display:flex;align-items:center;gap:20px;padding:12px 26px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:9px;}
+.brand .bar{width:9px;height:26px;border-radius:3px;background:linear-gradient(var(--a),var(--a2));}
+.brand .txt{font:800 15px 'Saira Condensed';letter-spacing:.14em;}
+.navlinks{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto;}
+.navlinks a{font:600 12px 'Space Grotesk';letter-spacing:.04em;color:var(--sub);padding:7px 12px;border-radius:8px;}
+.navlinks a:hover{color:var(--text);background:var(--panel);}
+.navlinks a.active{color:var(--aText);background:var(--a);}
+.hero{padding:44px 0 8px;}
+.hero .eyebrow{font:600 12px 'Space Grotesk';letter-spacing:.22em;color:var(--a);text-transform:uppercase;}
+.hero h1{font:400 clamp(40px,6vw,68px)/.92 'Anton';text-transform:uppercase;margin:10px 0 0;}
+.hero p{font:400 16px/1.6 'Space Grotesk';color:var(--sub);max-width:700px;margin:14px 0 0;}
+.sec{display:flex;align-items:center;gap:12px;margin:38px 0 16px;}
+.sec h2{font:400 22px 'Anton';letter-spacing:.02em;text-transform:uppercase;margin:0;}
+.sec .line{flex:1;height:1px;background:var(--border);}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.card{border-radius:16px;border:1px solid var(--border);background:var(--panel);padding:18px 20px;display:flex;flex-direction:column;gap:10px;}
+.card .name{font:400 21px 'Anton';text-transform:uppercase;letter-spacing:.01em;}
+.badge{font:700 10px 'Space Grotesk';letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid var(--border);color:var(--sub);white-space:nowrap;}
+.badge.good{color:var(--aText);background:var(--good);border-color:var(--good);}
+.badge.a{color:var(--aText);background:var(--a);border-color:var(--a);}
+.badge.gold{color:#1a0505;background:var(--gold);border-color:var(--gold);}
+.card .def{font:400 14px/1.6 'Space Grotesk';color:var(--text);}
+.card .read{font:400 13px/1.6 'Space Grotesk';color:var(--sub);border-left:2px solid var(--a);padding-left:12px;}
+.card .read b{color:var(--text);font-weight:600;}
+.stat{font:700 30px 'Saira Condensed';}
+.stat .u{font:600 13px 'Space Grotesk';color:var(--sub);margin-left:6px;}
+.kv{display:flex;justify-content:space-between;font:500 13px 'Space Grotesk';color:var(--sub);padding:3px 0;}
+.kv b{color:var(--text);font:700 13px 'JetBrains Mono';}
+.mono{font-family:'JetBrains Mono';}
+.dist{margin-top:2px;}
+.dist .track{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--panel2),color-mix(in srgb,var(--a) 30%,var(--panel2)));border:1px solid var(--border);}
+.dist .med{position:absolute;top:-3px;width:2px;height:16px;background:var(--text);border-radius:2px;}
+.dist .ends{display:flex;justify-content:space-between;margin-top:7px;font:600 11px 'JetBrains Mono';color:var(--sub);}
+.dist .ex{display:flex;justify-content:space-between;gap:8px;margin-top:9px;font:500 11px 'Space Grotesk';}
+.dist .ex .chip{display:flex;align-items:center;gap:6px;color:var(--sub);}
+.dist .ex .chip b{font:700 12px 'Saira Condensed';color:var(--text);}
+.dist .ex .dot{width:7px;height:7px;border-radius:2px;}
+.toolbar{display:flex;gap:12px;align-items:center;margin:26px 0 6px;flex-wrap:wrap;}
+.search{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:11px 15px;}
+.search input,select{background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font:500 14px 'Space Grotesk';padding:9px 12px;outline:none;}
+.search input{flex:1;border:none;padding:0;background:none;}
+.count{font:600 12px 'JetBrains Mono';color:var(--sub);}
+.empty{grid-column:1/-1;text-align:center;color:var(--sub);font:500 14px 'Space Grotesk';padding:40px;}
+footer{margin-top:44px;font:500 12px/1.7 'Space Grotesk';color:var(--sub);}
+footer a{color:var(--a);}
+.cmp{display:grid;grid-template-columns:1fr 60px 1fr;gap:10px;align-items:center;margin:8px 0;}
+.cmp .lab{grid-column:1/-1;text-align:center;font:600 11px 'Space Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-top:8px;}
+.cmp .bar{height:26px;border-radius:6px;background:var(--panel2);position:relative;overflow:hidden;border:1px solid var(--border);}
+.cmp .fill{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,var(--a2),var(--a));}
+.cmp .fill.r{right:0;} .cmp .fill.l{left:0;}
+.cmp .v{position:absolute;top:5px;font:700 13px 'JetBrains Mono';color:#fff;}
+.cmp .mid{text-align:center;font:600 11px 'Space Grotesk';color:var(--sub);}
+.dhead{font:400 18px 'Anton';text-transform:uppercase;letter-spacing:.02em;color:var(--a);}
+.shdr{display:grid;grid-template-columns:1.3fr .9fr 1.4fr;gap:8px;font:600 10px 'Space Grotesk';letter-spacing:.06em;text-transform:uppercase;color:var(--sub);padding-bottom:4px;border-bottom:1px solid var(--border);}
+.srow{display:grid;grid-template-columns:1.3fr .9fr 1.4fr;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.steam{display:flex;align-items:center;gap:7px;font:700 14px 'Saira Condensed';}
+.steam .srec{font:500 11px 'JetBrains Mono';color:var(--sub);}
+.pdot{width:8px;height:8px;border-radius:2px;background:var(--gold);flex:none;}
+.pdot.off{background:rgba(255,255,255,.12);}
+.sproj{font:700 16px 'JetBrains Mono';display:flex;flex-direction:column;line-height:1.1;}
+.sproj .srange{font:500 10px 'JetBrains Mono';color:var(--sub);}
+.obar{position:relative;height:18px;border-radius:5px;background:var(--panel2);border:1px solid var(--border);overflow:hidden;}
+.obar .ofill{position:absolute;top:0;bottom:0;left:0;}
+.obar .oval{position:absolute;right:6px;top:2px;font:700 11px 'JetBrains Mono';color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);}
+@media(max-width:760px){.grid,.grid3{grid-template-columns:1fr;}}
+</style></head><body><div class="nav"><div class="in">
+  <a class="brand" href="index.html"><span class="bar"></span><span class="txt">DIAMOND<span style="color:var(--a);">IQ</span></span></a>
+  <div class="navlinks">
+    <a href="compare.html">Compare Teams</a>
+    <a href="simulator.html">Season Sim</a>
+    <a href="glossary.html" class="active">Stat Guide</a>
+    <a href="models.html">The Models</a>
+    <a href="index.html">Dashboard</a>
+    <a href="https://github.com/Steve27M/mlb-analytics" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</div></div><div class="wrap"><div class="hero"><div class="eyebrow">Data Dictionary</div><h1>Stat Guide</h1>
+      <p id="sub"></p></div>
+      <div class="toolbar"><div class="search"><span style="color:var(--sub);">🔎</span>
+        <input id="q" type="text" placeholder="Search a stat — e.g. xwOBA, BABIP, framing, RE24…"
+        autocomplete="off"></div><span class="count" id="count"></span></div>
+      <div id="body"></div><footer>
+  Built from the <a href="https://github.com/Steve27M/mlb-analytics">mlb-analytics</a> warehouse (2,184,101 pitches,
+  2023–2025). Data: MLB Advanced Media
+  (statsapi / Baseball Savant) — individual, non-commercial, non-bulk use; raw data not
+  redistributed. Player crosswalk: Chadwick Bureau (ODC-By). Draft: Wikipedia (CC BY-SA).
+  Aggregates and code only.
+</footer><script>const DATA={"season": 2025, "nTeams": 30, "groups": [{"name": "Rate stats", "stats": [{"name": "OPS", "dir": "high", "def": "On-base plus slugging \u2014 a quick, powerful summary of overall hitting: how often you reach base plus how much power you hit for.", "read": "League average is ~.720. Above .900 is All-Star; a full-season 1.000+ is an MVP line.", "dist": {"min": 0.468, "med": 0.729, "max": 1.15, "lo": {"abbr": "Brandon Drury", "val": 0.468}, "hi": {"abbr": "Aaron Judge", "val": 1.15}}}, {"name": "K% (strikeout rate)", "dir": "low", "def": "Share of plate appearances that end in a strikeout.", "read": "The single most <b>stable</b> hitter skill year to year (M1). ~22% is average; elite contact hitters sit near 10%, three-true-outcome sluggers push 30%+.", "dist": {"min": 0.032, "med": 0.22, "max": 0.426, "lo": {"abbr": "Luis Arr\u00e1ez", "val": 0.032}, "hi": {"abbr": "Joey Gallo", "val": 0.426}}}, {"name": "BB% (walk rate)", "dir": "high", "def": "Share of plate appearances that end in a walk \u2014 a measure of plate discipline.", "read": "Also very stable year to year. ~8% average; the best eyes in baseball draw walks 15%+.", "dist": {"min": 0.023, "med": 0.081, "max": 0.192, "lo": {"abbr": "Javier B\u00e1ez", "val": 0.023}, "hi": {"abbr": "Aaron Judge", "val": 0.192}}}, {"name": "BABIP", "dir": "high", "def": "Batting average on balls in play \u2014 how often batted balls (not HR, not strikeouts) fall for hits.", "read": "Mostly <b>noise</b> (M1, M7): a ~.300 league average with big year-to-year swings driven by luck, defense, and park. High BABIP one year rarely repeats.", "dist": {"min": 0.194, "med": 0.295, "max": 0.407, "lo": {"abbr": "Eddie Rosario", "val": 0.194}, "hi": {"abbr": "Brandon Marsh", "val": 0.407}}}]}, {"name": "Statcast / expected", "stats": [{"name": "xwOBA", "dir": "high", "def": "Expected weighted on-base average \u2014 the value a batted ball 'should' produce given its exit velocity and launch angle, independent of defense/luck.", "read": "Separates real contact quality from batted-ball luck. We rebuild the core relationship in M2/M3 (launch speed + angle \u2192 value).", "dist": null}, {"name": "xwOBA-over-expected", "dir": "high", "def": "A hitter's actual outcome value minus what their batted-ball profile predicts \u2014 over- or under-performance (M2/M3 residuals).", "read": "Positive = beating the physics (speed, spray, luck); negative = getting less than the contact quality warrants.", "dist": null}, {"name": "Exit velocity / launch angle", "dir": "high", "def": "How hard (mph) and at what vertical angle (degrees) a ball leaves the bat \u2014 the two inputs to expected value.", "read": "Barrels live near ~98+ mph and 25\u201330\u00b0. Value is concave in angle: there's an optimal window, too flat or too steep both hurt (M2).", "dist": null}, {"name": "Spin rate / pitch arsenal", "dir": "high", "def": "A pitcher's mix of pitch types and their velocity, spin, and movement \u2014 the raw material of 'stuff'.", "read": "M6 clusters pitchers into archetypes (power, finesse, spin) from these features via PCA + k-means.", "dist": null}]}, {"name": "Run values", "stats": [{"name": "RE24 / run expectancy", "dir": "high", "def": "The expected runs a team will score from now to the end of the inning, for each of the 24 base-out states.", "read": "The backbone of modern value stats. Bases empty, 0 outs \u2248 <b>0.5</b> runs; bases loaded, 0 outs \u2248 2.3. We build it from our own play-by-play (matches published tables).", "dist": null}, {"name": "Linear weights / run value", "dir": "high", "def": "The average run value of an event (single, walk, HR, out\u2026), derived from RE24.", "read": "HR \u2248 <b>+1.4</b> runs, single \u2248 +0.47, walk \u2248 +0.31, strikeout \u2248 \u22120.27. These are the currency of wOBA, framing, and count value.", "dist": null}, {"name": "Framing runs", "dir": "high", "def": "Runs a catcher adds (or costs) by getting borderline takes called strikes more often than expected from pitch location (M4).", "read": "Elite framers are worth roughly +10 to +20 runs a season; the worst give back a similar amount. Real, measurable, and mostly invisible on TV.", "dist": null}, {"name": "Count value", "dir": "high", "def": "The run value of reaching each ball-strike count (M2 chains RE24 down to the pitch).", "read": "3-0 is a hitter's count (\u2248 +0.21 runs); 0-2 is the pitcher's (\u2248 \u22120.10). Swing rates flip with it: ~9% on 3-0, ~50% on 0-2.", "dist": null}]}, {"name": "Team & game", "stats": [{"name": "Win %", "dir": "high", "def": "Fraction of games a team wins.", "read": "Home teams win ~54% of games \u2014 the baseline any prediction model must beat.", "dist": {"min": 0.255, "med": 0.506, "max": 0.64, "lo": {"abbr": "Chicago White Sox", "val": 0.255}, "hi": {"abbr": "Atlanta Braves", "val": 0.64}}}, {"name": "Pythagorean win %", "dir": "high", "def": "Expected win rate from runs scored and allowed: RS^1.83 / (RS^1.83 + RA^1.83).", "read": "A team's run differential predicts its record better than its actual record does. We fit the exponent (B1) at ~1.83 and ~10 runs per win.", "dist": null}, {"name": "Win probability", "dir": "high", "def": "The game model's estimated chance the home team wins, from pre-game rolling form (leakage-safe).", "read": "On the sealed 2025 holdout it beats a home-field baseline on Brier score \u2014 a small real edge (AUC ~0.55). Baseball games are close to coin-flips; we say so.", "dist": null}, {"name": "Brier / AUC / calibration", "dir": "low", "def": "How good a probability model is: Brier = mean squared error (lower better); AUC = ranking skill (0.5 = coin-flip); calibration = do the predicted probabilities match reality.", "read": "The honest scoreboard for the game model \u2014 reported against baselines, not cherry-picked.", "dist": null}]}, {"name": "Concepts", "stats": [{"name": "Regression to the mean / ICC", "dir": "high", "def": "Extreme performances tend to move back toward average. ICC (intraclass correlation) is the share of a stat that is real, persistent skill vs. season-to-season noise (M7).", "read": "BABIP's ICC is ~0.27 \u2014 mostly noise, so we shrink each hitter's BABIP toward the mean.", "dist": null}, {"name": "Metric stability", "dir": "high", "def": "How repeatable a stat is year to year (M1). Skills stabilize fast; luck-driven stats don't.", "read": "K% and BB% correlate ~0.8 year to year (skill); BABIP ~0.3 (noise). This is why we trust some numbers and regress others.", "dist": null}, {"name": "Permutation test", "dir": null, "def": "A way to ask 'is this real or random?' by shuffling the data thousands of times and seeing where the actual result lands (B5 streaks).", "read": "Most hitting streaks are statistically indistinguishable from a fair coin \u2014 hot hands are mostly a story we tell.", "dist": null}, {"name": "R\u2194Python parity gate", "dir": null, "def": "Every model is built twice \u2014 in R and in Python \u2014 and the build fails unless they agree (coefficients, clusters, or simulated distributions).", "read": "Proof the numbers aren't an artifact of one tool. Three tiers: exact, label-invariant (PCA/clustering), and distributional (simulations agree within Monte-Carlo error).", "dist": null}]}]};
+const DIR={high:{cls:'a',txt:'Higher is better'},low:{cls:'gold',txt:'Lower is better'}};
+document.getElementById('sub').textContent=`Every metric on the DIAMONDIQ dashboard in plain English `
+  +`— what it measures, how to read it, and where the ${DATA.season} field landed.`;
+function distBar(d,dir){ if(!d) return '';
+  const span=(d.max-d.min)||1, medPct=((d.med-d.min)/span*100).toFixed(1);
+  const hi=(dir==='high'); const lead=hi?d.hi:d.lo, trail=hi?d.lo:d.hi;
+  const gd='<span class="dot" style="background:var(--a);"></span>';
+  const bd='<span class="dot" style="background:var(--sub);"></span>';
+  return `<div class="dist"><div class="track"><div class="med" style="left:${medPct}%;"></div></div>
+    <div class="ends"><span>min ${d.min}</span><span>median ${d.med}</span><span>max ${d.max}</span></div>
+    <div class="ex"><span class="chip">${gd}Leader <b>${lead.abbr} ${lead.val}</b></span>
+    <span class="chip">${bd}Trailer <b>${trail.abbr} ${trail.val}</b></span></div></div>`; }
+function card(s){ const dir=DIR[s.dir]; const badge=dir?`<span class="badge ${dir.cls}">${dir.txt}</span>`:'';
+  return `<div class="card"><div class="top" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <span class="name">${s.name}</span>${badge}</div>
+    <div class="def">${s.def}</div><div class="read"><b>How to read it:</b> ${s.read}</div>
+    ${distBar(s.dist,s.dir)}</div>`; }
+function render(f){ f=(f||'').trim().toLowerCase(); let shown=0,total=0;
+  const html=DATA.groups.map(g=>{ const cs=g.stats.map(s=>{ total++;
+    const hay=(s.name+' '+s.def+' '+s.read).toLowerCase();
+    if(f&&!hay.includes(f)) return ''; shown++; return card(s); }).join('');
+    return cs?`<div class="sec"><h2>${g.name}</h2><span class="line"></span></div><div class="grid">${cs}</div>`:''; }).join('');
+  document.getElementById('body').innerHTML=html||'<div class="empty">No stats match.</div>';
+  document.getElementById('count').textContent=f?`${shown} of ${total} stats`:`${total} stats`; }
+document.getElementById('q').addEventListener('input',e=>render(e.target.value)); render('');
+</script>
+</div></body></html>

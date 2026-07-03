@@ -1,0 +1,28 @@
+[sqlfluff]
+dialect = duckdb
+templater = dbt
+# Keep sqlfluff as a templating-validity + parse + capitalization gate. The layout/aliasing rules
+# below fight this repo's intentional house style (column-aligned `as`, short CTE aliases, no blank
+# line between CTEs); ST03/AL10 also false-positive on correct, tested SCD2 SQL. Excluded on purpose.
+exclude_rules = LT01, LT02, LT05, LT08, LT09, LT14, AL01, AL10, AM03, AM05, CP03, RF01, RF02, RF03, RF04, ST03, ST06, ST07, ST09
+max_line_length = 100
+
+[sqlfluff:templater:dbt]
+project_dir = dbt
+profiles_dir = dbt
+
+[sqlfluff:indentation]
+indent_unit = space
+tab_space_size = 4
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = lower

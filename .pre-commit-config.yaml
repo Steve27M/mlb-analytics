@@ -1,0 +1,51 @@
+# Pre-commit hooks for mlb-analytics. Install once with `pre-commit install`.
+# Guards: Python lint (ruff), SQL lint (sqlfluff via the dbt templater), a secrets scan
+# (gitleaks), and hard blocks so no bronze/warehouse/raw data is ever staged.
+default_language_version:
+  python: python3
+repos:
+  # --- Python lint (the repo's established standard; ruff-format is intentionally not used) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  # --- SQL: lint the dbt models (local hook — needs the project's dbt templater + duckdb dialect) ---
+  - repo: local
+    hooks:
+      - id: sqlfluff-lint
+        name: sqlfluff lint (dbt models)
+        entry: uv run sqlfluff lint dbt/models
+        language: system
+        files: ^dbt/models/.*\.sql$
+        pass_filenames: false
+
+  # --- Secrets scan ---
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # --- Baseline hygiene + hard block on data/secret artifacts (check-only; won't rewrite files) ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+      - id: check-yaml
+      - id: check-toml
+
+  - repo: local
+    hooks:
+      - id: no-data-artifacts
+        name: block committing raw data / warehouse / bronze / gold
+        entry: >-
+          bash -c 'git diff --cached --name-only
+          | grep -E "^data/bronze/|^data/gold/|\.duckdb$|\.duckdb\.wal$"
+          && { echo "ERROR: raw data / warehouse artifacts must never be committed."; exit 1; }
+          || exit 0'
+        language: system
+        pass_filenames: false

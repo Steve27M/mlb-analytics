@@ -1,0 +1,123 @@
+version: 2
+
+models:
+  - name: dim_team
+    description: "GRAIN: one row per team_id (+ -1 Unknown placeholder)."
+    columns:
+      - name: team_id
+        tests: [not_null, unique]
+
+  - name: fct_game
+    description: "GRAIN: one row per played game (game_pk)."
+    columns:
+      - name: game_pk
+        tests: [not_null, unique]
+      - name: home_team_id
+        tests:
+          - relationships:
+              to: ref('dim_team')
+              field: team_id
+      - name: away_team_id
+        tests:
+          - relationships:
+              to: ref('dim_team')
+              field: team_id
+
+  - name: dim_player
+    description: "GRAIN: one row per player affiliation span (player_id, valid_from). SCD2."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_id, valid_from]
+    columns:
+      - name: player_version_key
+        tests: [not_null, unique]
+      - name: team_id
+        tests:
+          - relationships:
+              to: ref('dim_team')
+              field: team_id
+
+  - name: fct_plate_appearance
+    description: "GRAIN: one row per plate appearance (game_pk, at_bat_number)."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_pk, at_bat_number]
+    columns:
+      - name: base_state
+        tests:
+          - accepted_values:
+              values: [0, 1, 2, 3, 4, 5, 6, 7]
+
+  - name: gold_run_expectancy
+    description: "GRAIN: one row per (season, outs_start, base_state) — the RE24 matrix."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [season, outs_start, base_state]
+    columns:
+      - name: run_expectancy
+        tests: [not_null]
+
+  - name: gold_batter_season
+    description: "GRAIN: one row per (batter_id, season). Rate stats for M1 metric stability."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [batter_id, season]
+
+  - name: gold_batted_balls
+    description: "GRAIN: one row per batted ball (pitch_key). M2/M3 xwOBA feed."
+    columns:
+      - name: pitch_key
+        tests: [not_null, unique]
+
+  - name: gold_called_pitches
+    description: "GRAIN: one row per taken pitch (pitch_key). M4 framing feed."
+    columns:
+      - name: pitch_key
+        tests: [not_null, unique]
+
+  - name: gold_pitcher_start
+    description: "GRAIN: one row per pitcher start (game_pk, pitcher_id). M5 Poisson feed."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_pk, pitcher_id]
+
+  - name: gold_pitcher_arsenal
+    description: "GRAIN: one row per (pitcher_id, season). M6 arsenal PCA/clustering feed."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [pitcher_id, season]
+
+  - name: gold_team_season
+    description: "GRAIN: one row per team-season (team_id, season). B1 Pythagorean feed."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_id, season]
+
+  - name: gold_team_form
+    description: "GRAIN: one row per team per game (game_pk, team_id). Leakage-safe rolling form."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_pk, team_id]
+    columns:
+      - name: team_id
+        tests:
+          - relationships:
+              to: ref('dim_team')
+              field: team_id
+
+  - name: fct_team_game
+    description: "GRAIN: one row per team per game (game_pk, team_id)."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_pk, team_id]
+    columns:
+      - name: team_id
+        tests:
+          - relationships:
+              to: ref('dim_team')
+              field: team_id
+      - name: game_pk
+        tests:
+          - relationships:
+              to: ref('fct_game')
+              field: game_pk

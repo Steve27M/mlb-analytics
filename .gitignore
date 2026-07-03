@@ -1,0 +1,57 @@
+# --- secrets / env ---
+.env
+.env.*
+!.env.example
+.Renviron
+!.Renviron.example
+*.pem
+*.key
+credentials.json
+
+# --- data (never publish raw or row-level MLB/odds data) ---
+# Ignore everything under data/ EXCEPT structural .gitkeep files and
+# selectively-committed aggregate results (added with `git add -f`).
+data/**
+!data/**/
+!data/**/.gitkeep
+data/bronze/**
+data/gold/**
+*.duckdb
+*.duckdb.wal
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# --- R / renv ---
+renv/library/
+renv/local/
+renv/cellar/
+renv/lock/
+renv/python/
+renv/staging/
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+
+# --- dbt (regenerable: `dbt deps` restores packages, `dbt build` recreates target/logs) ---
+dbt/dbt_packages/
+dbt/target/
+dbt/logs/
+dbt/.user.yml
+
+# --- quarto ---
+.quarto/
+/dashboard/*_files/
+
+# --- os / editors ---
+.DS_Store
+.idea/
+.vscode/
