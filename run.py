@@ -91,10 +91,14 @@ def ingest(season: str = typer.Option(None, help="Override MLB_SEASONS, e.g. '20
     env = {"MLB_SEASONS": season} if season else {}
     py = ["uv", "run", "python"]
     # Chadwick crosswalk first — it seeds dim_player_xref and prevents silent join loss later.
+    # people (birth years -> B3 aging) and draft (Wikipedia -> M8) are part of the spine that
+    # land.py loads; they must run in `ingest` or a clean clone fails at the land stage.
     scripts = [
         "ingest/pull_chadwick.py",
         "ingest/pull_statsapi.py",
         "ingest/pull_savant.py",
+        "ingest/pull_people.py",
+        "ingest/pull_draft.py",
         "ingest/pull_odds.py",
     ]
     for s in scripts:
