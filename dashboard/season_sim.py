@@ -6,8 +6,8 @@ models_r/game_model.R and models_py/game_model.py and is checked by the parity g
 (1) refit that same 3-feature logistic model on 2023-2024, (2) score every 2025 game with its
 LEAKAGE-SAFE pre-game rolling-form probability (a genuine forecast, never the 2025 outcome), and
 (3) simulate the real 2025 schedule N times to get each team's projected-win distribution and
-playoff odds. Cross-language RNG parity is explicitly out of scope per the project rules ("Never attempt
-cross-language RNG seed matching"), so the simulation lives on one side only.
+playoff odds. Cross-language RNG parity is explicitly out of scope per the project rules ("Never
+attempt cross-language RNG seed matching"), so the simulation lives on one side only.
 
 MLB playoff rule applied per league: 3 division winners (most wins in each division) + 3 wildcards
 (next 3 by wins). Ties broken deterministically by team_id (a documented simplification; real MLB
