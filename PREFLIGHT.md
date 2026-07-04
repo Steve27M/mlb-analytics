@@ -134,3 +134,25 @@ free source for the 2025 holdout.**
 (a) Preflight reviewed. (b) Betting-lines source chosen: stay free — baselines for v1, free
 forward accrual via The Odds API free tier (no-ops without a key). (c) wOBA self-derived; no
 FanGraphs. Phase 1 (ingestion) may begin.
+
+## 9. The Odds API — betting moneylines (approved 2026-07-04)
+
+Source: https://the-odds-api.com (v4 REST API). Auth: free API key (email signup); stored in the
+gitignored `.env` locally and as a GitHub Actions secret `ODDS_API_KEY` for the nightly pipeline —
+never committed. Verdict: **APPROVED** for banking 2026 pre-game moneyline (h2h) snapshots forward.
+
+- **Can:** use the free tier (500 credits/month; one MLB moneyline snapshot ≈ 1 credit, ~30/month
+  in-season — well within quota); display derived odds comparisons on the site (the T&C explicitly
+  permit user-facing display, "including commercial use, provided our data is not the primary
+  product being sold or redistributed"); store our own daily snapshots.
+- **Cannot / should-not:** resell, repackage, or redistribute the odds "as a standalone data
+  product … through your own API, data feed, downloadable files, or any other format intended to
+  serve as a source of raw data for others." Historical/closing snapshots are paid-only — we do NOT
+  use them; we bank our own live pre-game snapshot each day (closing lines cannot be backfilled).
+- **Binding storage rule (matches the repo's global posture):** raw per-game/per-book moneylines
+  are gitignored (private, like `data/bronze/`); ONLY the derived aggregate (model-vs-market
+  calibration / ROI summary) is committed, with attribution to The Odds API. This satisfies both
+  their no-redistribution clause and our "aggregates and code only" policy.
+- **Good-citizen:** descriptive UA, throttle + backoff, one small non-bulk pull/day; descriptive
+  analytics only (the betting page carries a "no betting advice" disclaimer); no PII.
+- Terms reviewed at https://the-odds-api.com/terms-and-conditions.html on 2026-07-04.
