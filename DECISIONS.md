@@ -3,6 +3,29 @@
 Non-trivial judgment calls (date, decision, alternatives, rationale), per the operating
 rules in `PROJECT_SPEC.md`. Newest first.
 
+## 2026-07-04 — Live-2026 foundation: frozen/live season split (design A)
+
+Ingested the current 2026 season; keeping the validated retrospective analysis FROZEN on complete
+seasons (2023-2025) while 2026 becomes an additive live layer (sim/betting only). Per FEEDBACK
+§10.4 (sealed 2025 holdout stays frozen; never retrain into it).
+- **dbt `analysis_seasons` var (default [2023,2024,2025])** filters the three staging entry points
+  (schedule, boxscore, statcast). Scopes ALL gold — including the POOLED tables (RE24, transitions)
+  that can't be filtered at export — so the frozen analysis reproduces EXACTLY with 2026 in bronze.
+  Verified: RE24(empty,0) 0.5084, 560715 PAs, and all 9 headline metrics + the 13-model parity gate
+  reproduce to the committed values. The `accepted_values` season test became `accepted_range(>=2023)`.
+- **BUG found + fixed — `pull_people` overwrote the frozen people set.** It pulled only the current
+  MLB_SEASONS roster and overwrote the single people partition, so the 2026 pull DROPPED players who
+  retired by 2026 → their birth years vanished → B3 aging peak jumped 30.0 -> 51.5 (KAT fail). Fixed
+  to be CUMULATIVE (union with the existing partition; birth years are stable so a union never
+  changes a value). Re-pulled 2023-2025 -> people back to 2235 players -> B3 peak restored to
+  exactly 30.0026.
+- **`n_pitches` scoped to gold's seasons** (was `count(*) from bronze.statcast`, which now includes
+  2026 -> inflated the footer on every page). Now counts only frozen-season pitches (2.18M).
+- **B4 Markov sim made byte-reproducible** (sort pa_transitions on from/to/runs before the
+  fixed-seed RNG, both R + Python) — same latent row-order non-determinism as the season sim. The
+  displayed sim RE was drifting within MC error across rebuilds (0.497 vs 0.486); now stable at 0.486.
+- Net: frozen retrospective rebuilds byte-identical; 2026 sits in bronze ready for the live layer.
+
 ## 2026-07-04 — Site restructure (FEEDBACK.md): reviewer decisions + Python-only data layer
 
 Implementing the audience-oriented site restructure (fan / data-eng / data-science / betting +

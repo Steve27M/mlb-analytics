@@ -36,6 +36,9 @@ def main() -> None:
     os.makedirs(res, exist_ok=True)
 
     df = pd.read_parquet(f"{gold}/pa_transitions.parquet")
+    # Stable transition order so the fixed-seed RNG maps to the same transitions every rebuild
+    # (parquet/DuckDB row order isn't guaranteed) — makes the simulated RE byte-reproducible.
+    df = df.sort_values(["from_state", "to_state", "runs"]).reset_index(drop=True)
     to_by = {int(s): g["to_state"].to_numpy() for s, g in df.groupby("from_state")}
     runs_by = {int(s): g["runs"].to_numpy() for s, g in df.groupby("from_state")}
 

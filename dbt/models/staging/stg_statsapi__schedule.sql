@@ -13,4 +13,6 @@ select
     away_name,
     cast(left(cast(game_date as varchar), 4) as integer) as season
 from {{ source('bronze', 'statsapi_schedule') }}
+-- Scope to the frozen analysis seasons (the live current season is handled by a separate track).
+where cast(left(cast(game_date as varchar), 4) as integer) in ({{ var('analysis_seasons') | join(', ') }})
 qualify row_number() over (partition by game_pk order by game_date desc) = 1

@@ -16,6 +16,9 @@ res <- Sys.getenv("MLB_RESULTS_DIR", "data/results")
 dir.create(res, showWarnings = FALSE, recursive = TRUE)
 
 df <- read_parquet(file.path(gold, "pa_transitions.parquet"))
+# Stable transition order so the fixed-seed RNG is reproducible across rebuilds (matches the
+# Python side; parquet/DuckDB row order isn't guaranteed).
+df <- df %>% arrange(from_state, to_state, runs)
 to_by <- split(df$to_state, df$from_state)
 runs_by <- split(df$runs, df$from_state)
 

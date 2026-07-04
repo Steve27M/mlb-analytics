@@ -12,6 +12,12 @@ seed-paths: ["seeds"]
 target-path: "target"
 clean-targets: ["target", "dbt_packages"]
 
+# Frozen analysis seasons: staging filters to these, so the whole validated analysis (incl. pooled
+# RE24) stays exactly reproducible even after the live current season lands in bronze. The live
+# season is built on a separate track (override this var).
+vars:
+  analysis_seasons: [2023, 2024, 2025]
+
 # Bronze is produced by the Python ingestion (land.py) and exposed to dbt as sources.
 # dbt owns staging -> silver -> gold + snapshots only.
 models:

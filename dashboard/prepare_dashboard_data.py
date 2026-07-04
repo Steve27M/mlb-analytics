@@ -64,8 +64,12 @@ def main() -> None:
         "select distinct season from gold.fct_game order by 1").fetchall()]
     through = str(con.execute(
         "select max(game_date) from gold.fct_game where game_type='R'").fetchone()[0])
-    meta = {"seasons": seasons, "n_pa": n_pa, "n_games": n_games,
-            "n_pitches": con.execute("select count(*) from bronze.statcast").fetchone()[0]}
+    # Scope the pitch count to the frozen analysis seasons (gold's seasons) — bronze.statcast also
+    # holds the live current season, which must not inflate the retrospective totals.
+    n_pitches = con.execute(
+        "select count(*) from bronze.statcast where game_year in "
+        "(select distinct season from gold.fct_game)").fetchone()[0]
+    meta = {"seasons": seasons, "n_pa": n_pa, "n_games": n_games, "n_pitches": n_pitches}
     provenance = {"seasons": seasons, "through": through, "seed": SIM_SEED,
                   "pythag_exp": round(e, 3)}
 

@@ -53,3 +53,5 @@ select
     post_home_score,
     post_away_score
 from {{ source('bronze', 'statcast') }}
+-- Scope to the frozen analysis seasons (the live current season is handled by a separate track).
+where game_year in ({{ var('analysis_seasons') | join(', ') }})

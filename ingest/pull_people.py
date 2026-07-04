@@ -8,13 +8,21 @@ from __future__ import annotations
 
 import pandas as pd
 
-from _common import get_json, log, seasons, write_partition
+from _common import bronze_dir, get_json, log, seasons, write_partition
 
 API = "https://statsapi.mlb.com/api/v1"
 
 
 def main() -> None:
     birth: dict[int, int] = {}
+    # CUMULATIVE: seed from the existing people set so players from prior seasons/pulls persist.
+    # A single current-season roster pull would otherwise DROP players who retired before that
+    # season — which the frozen analysis still needs (B3 aging joins on birth year). Birth years
+    # are stable, so unioning never changes an existing player's value.
+    existing = bronze_dir() / "people" / "set=all" / "data.parquet"
+    if existing.exists():
+        prev = pd.read_parquet(existing)
+        birth.update({int(r.player_id): int(r.birth_year) for r in prev.itertuples()})
     for season in seasons():
         data = get_json(f"{API}/sports/1/players", params={"season": season})
         for p in data.get("people", []):
