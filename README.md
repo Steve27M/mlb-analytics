@@ -33,7 +33,7 @@ exactly once, and a two-language parity gate that catches the bugs a single impl
   explains ~1% of production (corr(pick, OPS) = −0.10). Data gathered by an *ethical* Wikipedia
   scrape, not a paid feed.
 - **Season simulator.** 10,000 Monte-Carlo 2025 seasons driven by the model's leakage-safe game
-  probabilities recover the actual standings order at *r* = 0.90 and put 10 of the 12 real playoff
+  probabilities recover the actual standings order at *r* = 0.91 and put 10 of the 12 real playoff
   teams in the top 12 by odds — even though projected win totals correctly compress toward .500.
 
 ---

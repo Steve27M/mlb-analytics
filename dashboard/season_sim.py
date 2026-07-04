@@ -39,7 +39,9 @@ def _game_probs(gold: str) -> pd.DataFrame:
     """Refit the game model on 2023-2024 and return each 2025 game's leakage-safe P(home win)."""
     df = pd.read_parquet(f"{gold}/game_features.parquet")
     train = df[df["season"].isin([2023, 2024])]
-    test = df[df["season"] == 2025].copy()
+    # Sort by game_pk so the fixed-seed RNG maps to games in a stable order regardless of the
+    # parquet/DuckDB row order — makes the simulation byte-reproducible across environments.
+    test = df[df["season"] == 2025].sort_values("game_pk").copy()
     x_tr = sm.add_constant(train[FEATURES].to_numpy())
     m = sm.GLM(train["home_win"].to_numpy(), x_tr, family=sm.families.Binomial()).fit()
     test["p_home"] = m.predict(sm.add_constant(test[FEATURES].to_numpy()))

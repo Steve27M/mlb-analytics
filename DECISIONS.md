@@ -3,6 +3,29 @@
 Non-trivial judgment calls (date, decision, alternatives, rationale), per the operating
 rules in `PROJECT_SPEC.md`. Newest first.
 
+## 2026-07-04 — Phase 5 clean-clone GATE stamped (from-empty re-ingest; 2 bugs found)
+
+- **Ran the literal clean-clone end-to-end into an ISOLATED env** (all `MLB_*` roots pointed at a
+  scratch dir, real `data/` untouched) — a faithful fresh-clone test that also proves the Phase-6
+  env-var portability claim. Full from-empty pull of 2023-2025 (statcast 624 partitions / 2.18M
+  pitches, statsapi 625/624, draft 12, people 1), then land -> build (PASS=77) -> export (14 feeds)
+  -> models (R) -> parity (13/13 GATE green) -> dashboard. **Every headline metric reproduces the
+  committed numbers EXACTLY to 6 dp** (game Brier 0.246954, M1 0.819705, B1 1.733103, M8 -0.095828,
+  M6 ARI 0.9952, ...). Completed seasons are frozen, so no source drift; the pipeline is fully
+  reproducible.
+- **The clean-clone surfaced two real bugs (both fixed + committed):** (1) `run.py ingest` never
+  called `pull_people`/`pull_draft` though `land.py` loads them — a fresh clone would die at land
+  (B3 aging + M8 draft starved). (2) The draft pull hit a Wikipedia 429 (12 pages back-to-back) and
+  aborted because `get_json` ignored the server `Retry-After`; now it honors it (cap 60s) and draft
+  throttles at 2s. This is exactly what the gate exists to catch.
+- **Season simulator made env-deterministic** by sorting game rows on `game_pk` before the
+  fixed-seed RNG draws. Previously the sim zipped RNG to whatever order DuckDB/parquet returned, so
+  it drifted within MC noise across environments (0.902 vs 0.908). Now identical everywhere: r=0.906
+  (rounds to 0.91), 10/12 playoff teams. Aggregate model metrics were never affected (order-
+  invariant). README/DECISIONS updated 0.90 -> 0.91.
+- Background ingest jobs get killed at a ~1-2h ceiling; the pull's per-(source,date) idempotency
+  makes resume a fast cache-hit rescan, so the full crawl completes across a few relaunches.
+
 ## 2026-07-03 — Phase 5 local hardening (README, pre-commit, lint gates)
 
 - **Full README written from THIS build's real results and war stories** (not recycled from
@@ -58,7 +81,8 @@ rules in `PROJECT_SPEC.md`. Newest first.
   gated. Needs league/division structure absent from `dim_team`; added a static public reference
   `reference/team_divisions.csv` (30 teams). Honest result: projected wins compress toward .500
   (weak game model, AUC ~0.55 — games are near coin-flips), yet the ORDERING recovers actual
-  standings at **r=0.90** and the 12 highest-odds teams include **10 of 12** actual playoff teams.
+  standings at **r=0.91** and the 12 highest-odds teams include **10 of 12** actual playoff teams.
+  (Sim later made env-deterministic by sorting on game_pk; see 2026-07-04 Phase 5 clean-clone entry.)
   Surfaced as a 5th dashboard page with that compression caveat stated plainly.
 
 ## 2026-07-03 — Phase 4 dashboard: static HTML pages, not Quarto
