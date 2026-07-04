@@ -184,6 +184,27 @@ repo and run the pipeline to regenerate the data yourself.
 
 ---
 
+## Live pipeline (nightly)
+
+The site is also a **living product**: a nightly GitHub Actions workflow refreshes the in-progress
+2026 season while the 2023–2025 analysis stays frozen.
+
+- **Orchestration decision — Dagster for the programming model, GitHub Actions cron as the trigger,
+  no standing daemon.** A single nightly linear DAG doesn't justify a VPS/daemon; Actions cron is
+  $0 and the Dagster asset graph (`pipeline/defs.py`) stays portable if the cadence ever grows.
+  Both the Typer CLI and the Dagster assets are thin wrappers over one implementation
+  (`pipeline/stages.py`), so they can't drift. The dbt tests and the R↔Python parity gate are
+  **blocking asset checks** — a red gate stops the run before the site rebuilds.
+- **Frozen / live split.** The 13 models + the sealed-2025 evaluation are frozen (build once,
+  committed `metrics.json`); the nightly is **Python-only** (no R) — it rebuilds the frozen
+  warehouse from cached bronze, builds a *separate* live 2026 warehouse, and updates only the
+  simulator / betting / fan pages. A dbt `analysis_seasons` var keeps the frozen gold (including
+  pooled RE24) reproducing exactly even with 2026 in bronze.
+- **Cost & hygiene.** Bronze is cached between runs so ingest pulls only the daily delta (the first
+  run is a one-time cold crawl — trigger it manually). No Git LFS; raw data and closing lines stay
+  private; only aggregates + the built site are committed. Closing-line snapshots accrue forward
+  (they can't be backfilled) into a retrospective model-vs-market record — no live picks.
+
 ## License
 
 Code is provided for portfolio review. Baseball data belongs to its respective sources under the

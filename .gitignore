@@ -68,3 +68,6 @@ CLAUDE.md
 .dagster_home/
 .tmp_dagster_home_*/
 logs/
+
+# committed frozen results (aggregate; the nightly reads these instead of refitting R models)
+!data/results/metrics.json

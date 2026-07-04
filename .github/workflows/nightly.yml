@@ -1,0 +1,72 @@
+name: nightly-2026-refresh
+
+# Nightly live-2026 refresh: pull the day's games + closing-line snapshot, rebuild the frozen
+# warehouse (reproduces exactly) and the live 2026 warehouse, regenerate the site, commit the
+# changed pages. Python-only — the frozen 13 models never refit nightly (metrics.json is committed),
+# so no R toolchain is needed. See DECISIONS.md and README.
+on:
+  schedule:
+    - cron: "30 10 * * *"      # ~10:30 UTC (~6:30 ET); Actions cron has jitter, fine for nightly
+  workflow_dispatch: {}          # manual trigger (use this for the first, cache-seeding run)
+
+permissions:
+  contents: write                # the bot commits refreshed docs/ to main -> Pages redeploys
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # bronze/warehouse are gitignored (regenerate, never commit). Persist bronze between runs so
+      # ingest pulls only the 2026 delta instead of re-crawling 3+ seasons (idempotent, cache-first).
+      # COLD START: the very first run has no cache and will crawl all seasons (hours) — trigger it
+      # manually via workflow_dispatch and let it finish once; every run after is a fast delta.
+      - name: Restore bronze cache
+        uses: actions/cache@v4
+        with:
+          path: data/bronze
+          key: bronze-${{ github.run_id }}     # always write a fresh entry
+          restore-keys: bronze-                # restore the newest prior entry
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install (Python + dbt; no R needed)
+        run: |
+          pip install uv
+          uv sync --extra pipeline
+
+      - name: Refresh
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          MLB_SEASONS: "2023,2024,2025,2026"   # idempotent: 2023-25 cache-hit, 2026 delta pulls
+          MLB_DUCKDB_PATH: data/warehouse.duckdb
+          MLB_LIVE_DUCKDB_PATH: data/warehouse_live.duckdb
+        run: |
+          uv run python run.py ingest        # statsapi/Savant delta + daily closing-line snapshot
+          uv run python run.py land          # bronze -> frozen warehouse
+          uv run python run.py build         # frozen 2023-25 gold (+ 50 tests, frozen_run snapshot)
+          uv run python run.py determinism   # same-input determinism gate (build twice, compare)
+          uv run python run.py live          # 2026-only live warehouse (separate DuckDB)
+          uv run python run.py dashboard     # prepare + season_sim + live_sim + build_site
+
+      - name: Commit refreshed site (+ heartbeat keeps the schedule alive off-season)
+        run: |
+          mkdir -p docs/data
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > docs/data/last_run.txt
+          git config user.name "diamondiq-bot"
+          git config user.email "diamondiq-bot@users.noreply.github.com"
+          git add docs/
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -m "nightly: 2026 refresh $(date -u +%F)"
+            git push
+          fi
