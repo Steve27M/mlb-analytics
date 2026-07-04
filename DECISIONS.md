@@ -3,6 +3,34 @@
 Non-trivial judgment calls (date, decision, alternatives, rationale), per the operating
 rules in `PROJECT_SPEC.md`. Newest first.
 
+## 2026-07-04 — Site restructure (FEEDBACK.md): reviewer decisions + Python-only data layer
+
+Implementing the audience-oriented site restructure (fan / data-eng / data-science / betting +
+compare/simulator/glossary), driven by `FEEDBACK.md`. Reviewer-approved decisions:
+- **Deploy: Dagster-on-GitHub-Actions now, AWS later.** The §10 Dagster+Actions (no daemon, $0)
+  approach supersedes the PROJECT_SPEC Phase-6 AWS Lambda/Step Functions plan as the near-term
+  target; AWS is a later lift the same deployment-agnostic Dagster assets can move to.
+- **Odds capture: yes, PENDING a terms pre-flight.** Activate the existing `ODDS_API_KEY` hook to
+  bank 2026 closing lines (can't be backfilled) — but only after a PREFLIGHT.md verdict on The Odds
+  API (free tier, ToS, ethics/legal) is presented and approved, per the standing pre-flight rule.
+  Needs a user-provided free API key. Deferred into the Phase-2 nightly pipeline work.
+- **`run.py` stage refactor into importable functions (shared by Typer + Dagster): DEFERRED** to
+  the Phase-2 pipeline build.
+- **Theming: one dark system, distinct per-audience motifs/accents/layout. No light page** (a lone
+  light page in a dark site reads as broken; "lighter panels" = a lighter dark shade).
+- **New site data is a Python-only prep-layer rollup, NOT re-gated** (same precedent as the season
+  simulator — no new statistical estimation, just aggregation of the already-parity-gated
+  warehouse/models). Added to `prepare_dashboard_data.py`: calibration (game-model reliability, 5
+  EQUAL-COUNT quantile buckets with n — predictions cluster near .50 so equal-width would be empty
+  at the tails; the honest reliability curve is a short near-diagonal segment ~.46-.59), YoY skill
+  stability per stat (K% .82 / BB% .73 / OPS .51 / BABIP .30), Pythagorean luck (W - pythW) per
+  team-season, head-to-head season series, and data-mined fun facts.
+- **Pythagorean exponent unified to B1's FITTED value (1.733)** site-wide (was a hardcoded 1.83) —
+  on-brand ("derived from our own data") and consistent between the luck/pyth figures.
+- **Provenance strip is data-derived** ("through <max game_date>", seed 777), NOT wall-clock, so
+  `docs/` rebuilds stay byte-identical (§11 zero-diff). Wall-clock build time waits for the
+  Phase-2 `runs.json` (§10.4).
+
 ## 2026-07-04 — Phase 5 clean-clone GATE stamped (from-empty re-ingest; 2 bugs found)
 
 - **Ran the literal clean-clone end-to-end into an ISOLATED env** (all `MLB_*` roots pointed at a
