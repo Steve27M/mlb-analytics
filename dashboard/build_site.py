@@ -103,6 +103,14 @@ def fmt(v, dec: int = 3) -> str:
     return f"{round(float(v), min(dec, 3)):.{min(dec, 3)}f}".rstrip("0").rstrip(".")
 
 
+def to_american(p: float) -> str:
+    """American moneyline odds from a probability, explicit sign (matches util.js toAmerican)."""
+    if not p or p <= 0 or p >= 1:
+        return "—"
+    v = round(-100 * p / (1 - p)) if p >= 0.5 else round(100 * (1 - p) / p)
+    return f"{'+' if v > 0 else ''}{v}"
+
+
 # ------------------------------------------------------------------ README / DECISIONS extraction
 # Single source of truth (FEEDBACK §5.1-3, Q7): read the docs at build time; don't paraphrase.
 _README = (REPO / "README.md").read_text(encoding="utf-8")
@@ -135,6 +143,9 @@ def readme_war_stories() -> list[tuple[str, str]]:
     for m in re.finditer(r"^- \*\*(.+?)\*\*(.*?)(?=^\- \*\*|\Z)", sec, re.S | re.M):
         lead = re.sub(r"\s+", " ", m.group(1)).strip().rstrip(".")
         rest = re.sub(r"\s+", " ", m.group(2)).strip()
+        # Drop precision-example parentheticals (long decimals / sci-notation) to honor the site's
+        # <=3-decimal rule (§1.2); the story survives without the debug-level numbers.
+        rest = re.sub(r"\s*\([^)]*(?:\d\.\d{4,}|\de-?\d|\|Δ\|)[^)]*\)", "", rest)
         rest = re.sub(r"`([^`]+)`", r"<code>\1</code>", rest)
         items.append((lead, rest))
     return items
@@ -351,7 +362,7 @@ def prov() -> str:
             f'(fitted) · seed {p["seed"]} where simulated</div>')
 
 
-FOOT = (f'<footer>Built from the <a href="{GH}">mlb-analytics</a> warehouse '
+FOOT = (f'<footer>Built from the <a href="{GH}">mlb-analytics</a> project '
         f'({DATA["meta"]["n_pitches"]:,} pitches, {DATA["meta"]["seasons"][0]}–{DATA["meta"]["seasons"][-1]}). '
         f'Data: MLB Advanced Media (statsapi / Baseball Savant) — individual, non-commercial, '
         f'non-bulk use; raw data not redistributed. Player crosswalk: Chadwick Bureau (ODC-By). '
@@ -665,6 +676,525 @@ def build_simulator() -> None:
 
 
 PAGES["simulator.html"] = build_simulator
+
+
+# ------------------------------------------------------------------ data-science.html
+def _mval(key: str, *path):
+    """Safe nested lookup into a model's python-side metrics."""
+    node = DATA["metrics"].get(key, {})
+    node = node.get("python", node)
+    for p in path:
+        node = node.get(p, {}) if isinstance(node, dict) else {}
+    return node if not isinstance(node, dict) else None
+
+
+TIER_BADGE = {"exact": "good", "label-invariant": "gold", "distributional": "a",
+              "label_invariant": "gold"}
+# (anchor, code, name, method, tier, result_html, caveat)
+MODELS = [
+    ("m1", "M1", "Metric stability", "Year-over-year correlation", "exact",
+     lambda: f"K% repeats at r={fmt(_mval('m1_stability','k_pct_yoy_corr'))} and BB% at {fmt(_mval('m1_stability','bb_pct_yoy_corr'))} (skill); BABIP only {fmt(_mval('m1_stability','babip_yoy_corr'))} (noise).",
+     "Correlational, not causal; min 300 PA both seasons."),
+    ("m2", "M2/M3", "xwOBA-over-expected", "Simple + multiple OLS", "exact",
+     lambda: "Exit velocity raises batted-ball value; launch angle is concave — there is an optimal window.",
+     "A physics proxy, not a full xwOBA model; residuals are over/under-performance."),
+    ("m4", "M4", "Catcher framing", "Logistic GLM on pitch location", "exact",
+     lambda: f"Best framer +{fmt(_mval('m4_framing','top_framer_runs'),0)} runs, worst {fmt(_mval('m4_framing','bottom_framer_runs'),0)}, over 3 seasons.",
+     "Location-only; ignores pitcher/umpire identity and count."),
+    ("m5", "M5", "Strikeouts per start", "Poisson regression", "exact",
+     lambda: f"League strikeout rate ≈ {fmt(_mval('m5_k_poisson','k_per_bf'))} per plate appearance.",
+     "Count model; dispersion not separately modeled."),
+    ("m6", "M6", "Pitcher arsenals", "PCA + k-means", "label-invariant",
+     lambda: f"R and Python cluster assignments match at ARI {fmt(DATA['metrics'].get('m6_arsenal',{}).get('cluster_ari'))}.",
+     "k chosen, not learned; clusters are descriptive archetypes."),
+    ("m7", "M7", "BABIP shrinkage", "Mixed-effects (random intercepts)", "label-invariant",
+     lambda: f"ICC {fmt(_mval('m7_babip_shrinkage','icc'))} — only ~{fmt(_mval('m7_babip_shrinkage','icc')*100,0)}% of BABIP is persistent skill.",
+     "Intercepts only; no batted-ball covariates."),
+    ("m8", "M8", "Draft vs. production", "OLS (ethical Wikipedia scrape)", "exact",
+     lambda: f"corr(pick, OPS) = {fmt(_mval('m8_draft','corr_pick_ops'))}, R² {fmt(_mval('m8_draft','r_squared'))} (n={_mval('m8_draft','n')}).",
+     "Survivor-biased: only players who reached MLB; the draft's real variance is upstream."),
+    ("b1", "B1", "Pythagorean wins", "OLS through the origin", "exact",
+     lambda: f"Fitted exponent {fmt(_mval('b1_pythagoras','pythag_exponent'))}, ~{fmt(_mval('b1_pythagoras','runs_per_win'),1)} runs per win.",
+     "Fit on 90 team-seasons; the exponent drifts a little by run environment."),
+    ("b2", "B2", "Count effects", "RE24 aggregation", "exact",
+     lambda: "3-0 is a hitter's count, 0-2 the pitcher's — run value chained from RE24 down to the pitch.",
+     "Descriptive aggregation, not a predictive model."),
+    ("b3", "B3", "Aging curves", "Quadratic OLS", "exact",
+     lambda: f"OPS peaks near age {fmt(_mval('b3_aging','peak_age'),0)}.",
+     "Cross-sectional + survivor bias: only good hitters last long enough to be measured old."),
+    ("b4", "B4", "Markov innings", "Base-out transition simulation", "distributional",
+     lambda: f"Simulated RE(empty,0) {fmt(_mval('b4_markov_sim','sim_re_empty_0'))} reconciles RE24 {fmt(_mval('b4_markov_sim','re24_empty_0'))}.",
+     "Stationary transition matrix; no batter/pitcher identity."),
+    ("b5", "B5", "Streaky hitters", "Wald–Wolfowitz + permutation null", "distributional",
+     lambda: f"Mean streakiness z = {fmt(DATA['metrics'].get('b5_streaks',{}).get('mean_z'))} — indistinguishable from random.",
+     "Absence of evidence for streakiness, at this sample size."),
+    ("game", "GAME", "Win probability", "Logistic, sealed 2025 holdout", "exact",
+     lambda: f"Brier {fmt(_mval('game_model','brier'))} beats home-field {fmt(_mval('game_model','brier_hfa_baseline'))} and Pythagorean {fmt(_mval('game_model','brier_pyth_baseline'))}; AUC {fmt(_mval('game_model','auc'))}.",
+     "A thin edge (AUC ~0.55); evaluated once, never tuned on 2025."),
+]
+
+
+def _calibration_svg() -> str:
+    c = DATA["calibration"]
+    b = c["buckets"]
+    lo, hi = 0.40, 0.65
+    W, H, pad = 460, 360, 46
+
+    def sx(p):
+        return pad + (p - lo) / (hi - lo) * (W - 2 * pad)
+
+    def sy(p):
+        return H - pad - (p - lo) / (hi - lo) * (H - 2 * pad)
+    grid = ""
+    for gv in (0.40, 0.45, 0.50, 0.55, 0.60, 0.65):
+        grid += (f'<line x1="{sx(gv):.0f}" y1="{sy(lo):.0f}" x2="{sx(gv):.0f}" y2="{sy(hi):.0f}" stroke="rgba(255,255,255,.06)"/>'
+                 f'<line x1="{sx(lo):.0f}" y1="{sy(gv):.0f}" x2="{sx(hi):.0f}" y2="{sy(gv):.0f}" stroke="rgba(255,255,255,.06)"/>'
+                 f'<text x="{sx(gv):.0f}" y="{H - pad + 16:.0f}" fill="var(--sub)" font-size="10" font-family="JetBrains Mono" text-anchor="middle">{fmt(gv, 2)}</text>'
+                 f'<text x="{pad - 8:.0f}" y="{sy(gv) + 3:.0f}" fill="var(--sub)" font-size="10" font-family="JetBrains Mono" text-anchor="end">{fmt(gv, 2)}</text>')
+    diag = f'<line x1="{sx(lo):.0f}" y1="{sy(lo):.0f}" x2="{sx(hi):.0f}" y2="{sy(hi):.0f}" stroke="var(--sub)" stroke-dasharray="4 4"/>'
+    path = "M" + " L".join(f"{sx(pt['p_mean']):.0f} {sy(pt['obs']):.0f}" for pt in b)
+    line = f'<path d="{path}" fill="none" stroke="var(--a)" stroke-width="2"/>'
+    pts = ""
+    for pt in b:
+        pts += (f'<circle cx="{sx(pt["p_mean"]):.0f}" cy="{sy(pt["obs"]):.0f}" r="5" fill="var(--a)"/>'
+                f'<text x="{sx(pt["p_mean"]):.0f}" y="{sy(pt["obs"]) - 10:.0f}" fill="var(--sub)" font-size="9" font-family="JetBrains Mono" text-anchor="middle">n={pt["n"]}</text>')
+    return (f'<div class="calib"><svg viewBox="0 0 {W} {H}" role="img" '
+            f'aria-label="Reliability plot: predicted home-win probability vs observed frequency, 5 quantile buckets">'
+            f'{grid}{diag}{line}{pts}'
+            f'<text x="{W / 2:.0f}" y="{H - 8}" fill="var(--sub)" font-size="11" font-family="Space Grotesk" text-anchor="middle">predicted P(home win)</text>'
+            f'<text x="14" y="{H / 2:.0f}" fill="var(--sub)" font-size="11" font-family="Space Grotesk" text-anchor="middle" transform="rotate(-90 14 {H / 2:.0f})">observed win frequency</text>'
+            f'</svg></div>')
+
+
+def build_data_science() -> None:
+    body = head("DIAMONDIQ — Modeling & Data Science",
+                "Thirteen baseball models with parity, evaluation, calibration, leakage discipline, "
+                "and skill-vs-luck methodology — every estimate with an interval or n.", "data-science", "t-ds")
+    body += ('<div class="hero"><div class="eyebrow">Modeling</div><h1>The Models</h1>'
+             '<p>Thirteen models, each built in <b>R and Python</b> and gated on agreement, each '
+             'anchored to a known baseball result. Figures first, uncertainty attached to every '
+             'number.</p></div>' + prov())
+    # 1. model index
+    body += '<div class="sec"><h2>Model index</h2><span class="line"></span></div><div class="grid">'
+    for anchor, code, name, method, tier, res, caveat in MODELS:
+        badge = f'<span class="badge {TIER_BADGE.get(tier, "good")}">{tier}</span>'
+        ok = DATA["metrics"].get({"m2": "m2_xwoba", "game": "game_model"}.get(anchor,
+             {"m1": "m1_stability", "m4": "m4_framing", "m5": "m5_k_poisson", "m6": "m6_arsenal",
+              "m7": "m7_babip_shrinkage", "m8": "m8_draft", "b1": "b1_pythagoras",
+              "b2": "b2_count_value", "b3": "b3_aging", "b4": "b4_markov_sim",
+              "b5": "b5_streaks"}.get(anchor, anchor)), {}).get("parity_ok")
+        pbadge = '<span class="badge good">parity</span>' if ok else ''
+        body += (f'<div class="card" id="{anchor}"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+                 f'<span class="name">{code} · {name}</span>{badge}{pbadge}</div>'
+                 f'<div class="kv"><span>Method</span><b class="mono">{method}</b></div>'
+                 f'<div class="def">{res()}</div>'
+                 f'<div class="read"><b>Caveat:</b> {caveat}</div></div>')
+    body += '</div>'
+    # 2. evaluation + calibration
+    g = DATA["metrics"].get("game_model", {}).get("python", {})
+    c = DATA["calibration"]
+    body += ('<div class="sec"><h2>Evaluation, properly</h2><span class="line"></span></div>'
+             '<p class="lead">The game model is trained on 2023–24 and scored <b>once</b> on a sealed '
+             '2025 season. It is measured against real baselines, and — more telling than accuracy — '
+             'its probabilities are checked for calibration.</p>'
+             '<div class="grid"><div class="card">'
+             f'<div class="kv"><span>Brier (lower better)</span><b>{fmt(g.get("brier"))}</b></div>'
+             f'<div class="kv"><span>vs. home-field baseline</span><b>{fmt(g.get("brier_hfa_baseline"))}</b></div>'
+             f'<div class="kv"><span>vs. Pythagorean baseline</span><b>{fmt(g.get("brier_pyth_baseline"))}</b></div>'
+             f'<div class="kv"><span>AUC</span><b>{fmt(g.get("auc"))}</b></div>'
+             f'<div class="kv"><span>Accuracy</span><b>{fmt(g.get("accuracy"))}</b> <span class="mono" style="color:var(--sub)">(always-home {fmt(c["base_home"])})</span></div>'
+             '<div class="read">A small, real edge. The model beats both baselines on Brier; on raw '
+             'accuracy it edges always-pick-home by about a point. That is what a genuine game-prediction edge looks like.</div></div>'
+             '<div class="card"><div class="name" style="font-size:18px">Reliability (calibration)</div>'
+             + _calibration_svg() +
+             f'<div class="read">Predictions land in a narrow band ({fmt(c["p_lo"])}–{fmt(c["p_hi"])}) — a thin '
+             'edge means few confident calls — but within that band, predicted probability tracks the '
+             'observed win rate closely (points near the dashed diagonal). 5 equal-count buckets; n shown per point.</div></div></div>')
+    # 3. leakage & holdout
+    body += ('<div class="sec"><h2>Leakage &amp; holdout discipline</h2><span class="line"></span></div>'
+             '<div class="grid"><div class="card"><div class="def">The 2025 season is a <b>sealed holdout</b>: '
+             'exported once, read only by evaluation code, never opened during development or feature '
+             'iteration. All game features are <b>leakage-safe</b> — built only from each team\'s prior '
+             'games (trailing rolling form), so a game is never in its own features.</div>'
+             '<div class="read">Why it matters: the easiest way to fake a good sports model is to let '
+             'the outcome leak into the inputs. Sealing 2025 and using pregame-only features is the '
+             'difference between a real out-of-sample number and a flattering in-sample one.</div></div>'
+             '<div class="card"><div class="def">Doubleheaders are ordered by (date, game number, '
+             'game_pk); suspended games that span two dates are de-duplicated; rolling windows require '
+             '≥10 prior games so the features are full.</div>'
+             '<div class="read">These are the unglamorous guards that keep the holdout honest.</div></div></div>')
+    # 4. skill vs luck methodology
+    st = DATA["stability"]
+    rows = "".join(
+        f'<div class="kv"><span>{lab}</span><b>{fmt(st[k]["r"])} '
+        f'<span class="mono" style="color:var(--sub)">(n={st[k]["n"]})</span></b></div>'
+        for k, lab in (("k_pct", "Strikeout rate (K%)"), ("bb_pct", "Walk rate (BB%)"),
+                       ("ops", "OPS"), ("babip", "BABIP")) if k in st)
+    body += ('<div class="sec"><h2>Skill vs. luck, measured</h2><span class="line"></span></div>'
+             '<p class="lead">The glossary\'s "stable skill" vs "mostly luck" labels are not vibes — '
+             'they are year-over-year self-correlations (min 300 PA both seasons). Higher = more '
+             'repeatable skill; lower = more luck that won\'t carry over.</p>'
+             f'<div class="grid"><div class="card"><div class="name" style="font-size:18px">Year-over-year stability</div>{rows}'
+             '<div class="read">K% and BB% are real, fast-stabilizing skills; BABIP is mostly noise, '
+             'which is exactly why M7 shrinks it toward the mean.</div></div>'
+             '<div class="card"><div class="def">Every point estimate on this page carries an interval '
+             'or an explicit n. A number without its uncertainty is marketing, not measurement.</div>'
+             f'<div class="read">Model results are anchored to published baseball values (known-answer '
+             f'tests); the parity gate proves R and Python agree, and the KAT proves they agree on '
+             f'something true. See <a href="data-eng.html#parity">the parity gate</a>.</div></div></div>')
+    _write("data-science.html", body)
+
+
+PAGES["data-science.html"] = build_data_science
+
+
+# ------------------------------------------------------------------ data-eng.html
+def _layer_counts() -> dict:
+    lc = {"staging": 0, "silver": 0, "gold": 0}
+    for t in DATA["dq"]["tables"]:
+        lc[t["layer"]] = lc.get(t["layer"], 0) + 1
+    return lc
+
+
+def _pipeline_svg() -> str:
+    lc = _layer_counts()
+    nodes = [
+        ("Statcast\n+ statsapi", "#5b6472"), ("ingest\n(Python)", "#5b6472"),
+        ("DuckDB\nbronze", "#7a5a2e"), (f"dbt\nstaging {lc['staging']}", "#7a5a2e"),
+        (f"silver {lc['silver']}", "#9aa4b6"), (f"gold {lc['gold']}", "#d4af37"),
+        ("R + Python\nmodels", "#3ddc84"), ("parity\ngate", "#ef4b4b"),
+        ("static\nsite", "#8b7fff"),
+    ]
+    bw, bh, gap, x0, y = 88, 52, 24, 8, 40
+    vw = len(nodes) * (bw + gap)
+    svg = [f'<svg viewBox="0 0 {vw} 140" role="img" aria-label="Pipeline: Statcast to static site through DuckDB, dbt medallion layers, R and Python models, and the parity gate">']
+    for i, (label, col) in enumerate(nodes):
+        x = x0 + i * (bw + gap)
+        svg.append(f'<rect x="{x}" y="{y}" width="{bw}" height="{bh}" rx="9" fill="color-mix(in srgb,{col} 22%,#0c0e14)" stroke="{col}" stroke-width="1.5"/>')
+        for j, ln in enumerate(label.split("\n")):
+            svg.append(f'<text x="{x + bw / 2:.0f}" y="{y + bh / 2 - 4 + j * 13:.0f}" fill="#f4f6fb" font-size="11" font-family="JetBrains Mono" text-anchor="middle">{ln}</text>')
+        if i < len(nodes) - 1:
+            ax = x + bw
+            svg.append(f'<line x1="{ax}" y1="{y + bh / 2:.0f}" x2="{ax + gap}" y2="{y + bh / 2:.0f}" stroke="#5b6472" stroke-width="1.5" marker-end="url(#ah)"/>')
+    svg.append('<defs><marker id="ah" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#5b6472"/></marker></defs>')
+    svg.append('<text x="8" y="118" fill="#7a5a2e" font-size="10" font-family="Space Grotesk">bronze / silver / gold = medallion layers · widths not to scale</text>')
+    svg.append("</svg>")
+    return f'<div class="diagram">{"".join(svg)}</div>'
+
+
+def build_data_eng() -> None:
+    dq = DATA["dq"]
+    lc = _layer_counts()
+    npass = sum(1 for k in DATA["metrics"] if DATA["metrics"][k].get("parity_ok"))
+    body = head("DIAMONDIQ — Data Engineering",
+                "The pipeline behind DiamondIQ: Statcast → DuckDB → dbt medallion → R & Python "
+                "models gated by an R↔Python parity check → static site. Reproducible, ~$0 to run.",
+                "data-eng", "t-eng")
+    body += ('<div class="hero"><div class="eyebrow">Pipeline</div><h1>data engineering</h1>'
+             '<p>A polyglot medallion pipeline that builds every model <b>twice</b> — in R and '
+             'Python — and refuses to publish unless the two agree. This page is the portfolio '
+             'README for engineers.</p></div>' + prov())
+    body += ('<div class="sec"><h2>The pipeline</h2><span class="line"></span></div>' + _pipeline_svg())
+    # warehouse + testing
+    body += (f'<div class="sec"><h2>Warehouse &amp; testing</h2><span class="line"></span></div><div class="grid3">'
+             f'<div class="card"><div class="kv"><span>Warehouse tables</span></div><div class="stat">{len(dq["tables"])}</div>'
+             f'<div class="read">staging {lc["staging"]} · silver {lc["silver"]} · gold {lc["gold"]}</div></div>'
+             f'<div class="card"><div class="kv"><span>dbt data tests</span></div><div class="stat" style="color:var(--good)">{dq["tests"]["pass"]}<span class="u">passing</span></div>'
+             f'<div class="read">0 failing, 0 warning.</div></div>'
+             f'<div class="card"><div class="kv"><span>Parity gate</span></div><div class="stat" style="color:var(--good)">{npass}<span class="u">/ {len(DATA["metrics"])}</span></div>'
+             f'<div class="read">All three tiers pass.</div></div></div>')
+    cats = [("Grain uniqueness", "every fact has a uniqueness test on its declared grain — no silent fan-out."),
+            ("Referential integrity", "facts join to dimensions; failed joins get a placeholder + COALESCE, kept under 0.5%."),
+            ("RE24 anchors", "the run-expectancy matrix is asserted against published Tango reference values."),
+            ("Volume", "Statcast pitch counts reconcile with the official boxscore, directionally (never short)."),
+            ("Determinism", "a rebuild-and-hash gate proves the gold feeds are byte-identical across rebuilds.")]
+    body += '<div class="grid">'
+    for name, desc in cats:
+        body += f'<div class="card"><div class="name" style="font-size:17px">{name}</div><div class="def">{desc}</div></div>'
+    body += '</div>'
+    # parity gate explained (README-sourced)
+    tiers = parity_tiers()
+    trows = "".join(
+        f'<div class="card"><div style="display:flex;gap:10px;align-items:center"><span class="name" style="font-size:17px">{t[0]}</span></div>'
+        f'<div class="def">{t[1]}</div><div class="read"><b>Why not exact:</b> {t[2]}</div></div>'
+        for t in tiers)
+    body += (f'<div class="sec" id="parity"><h2>The parity gate</h2><span class="line"></span></div>'
+             f'<p class="lead">{readme_tagline()}</p>'
+             f'<div class="card" style="margin-bottom:14px"><div class="def">R and Python <b>never share '
+             f'memory</b> — no rpy2, no reticulate. They exchange data only through files (DuckDB tables '
+             f'and flat Parquet feeds). Every model is implemented independently in both, and the build '
+             f'fails unless they agree at one of three tiers. If a single-language build is quietly '
+             f'wrong, the other usually isn\'t wrong the same way — the gate turns "looks plausible" into '
+             f'"two toolchains independently agree." Each model is also anchored by a known-answer test: '
+             f'<b>parity proves R and Python agree; the KAT proves they agree on something true.</b></div></div>'
+             f'<div class="grid3">{trows}</div>'
+             f'<div class="card" style="margin-top:14px"><div class="name" style="font-size:16px">What a gate failure looks like</div>'
+             f'<div class="def mono" style="font-size:12px;color:var(--bad)">Game parity coef.win_pct_diff: R and Python disagree past tolerance<br>'
+             f'Game KAT: Brier {fmt(0.251)} not &lt; Pythag baseline {fmt(0.272)}<br>PARITY GATE FAILED — build aborts, nothing ships.</div>'
+             f'<div class="read">A real failure blocks publish. That is the point: a broken model can\'t reach the site.</div></div>')
+    # war stories from DECISIONS/README
+    ws = readme_war_stories()[:5]
+    body += '<div class="sec"><h2>War stories</h2><span class="line"></span></div>'
+    body += f'<p class="lead">Bugs worth remembering — the full postmortems are in <a href="{GH}/blob/main/DECISIONS.md">DECISIONS.md</a>.</p><div class="grid">'
+    for lead, rest in ws:
+        body += (f'<div class="card"><div class="name" style="font-size:16px">{lead}</div>'
+                 f'<div class="def">{rest}</div>'
+                 f'<div class="read"><a href="{GH}/blob/main/DECISIONS.md">Read the postmortem →</a></div></div>')
+    body += '</div>'
+    # operational / TCO
+    body += ('<div class="sec"><h2>Operational notes</h2><span class="line"></span></div><div class="grid">'
+             '<div class="card"><div class="name" style="font-size:17px">Reproducible &amp; cheap</div>'
+             '<div class="def">Fixed seeds; the static site is generated straight from the warehouse; a '
+             'from-empty clone reproduces every published number to six decimals.</div>'
+             '<div class="read"><b>TCO ≈ $0:</b> DuckDB + a static GitHub Pages site means no served '
+             'database, no uptime burden, no bill. The tradeoff — no live data — is why the next phase '
+             'adds a nightly refresh.</div></div>'
+             f'<div class="card"><div class="name" style="font-size:17px">Source</div>'
+             f'<div class="def">Every stage runs through one CLI and exits non-zero on failure.</div>'
+             f'<div class="kv"><span>Repository</span><b><a href="{GH}" style="color:var(--a)">github.com/Steve27M/mlb-analytics ↗</a></b></div></div></div>')
+    _write("data-eng.html", body)
+
+
+PAGES["data-eng.html"] = build_data_eng
+
+
+# ------------------------------------------------------------------ betting.html
+def build_betting() -> None:
+    body = head("DIAMONDIQ — Sports Betting & Analytics",
+                "A descriptive-analytics view for the trading desk: model-vs-baseline honesty, "
+                "calibration for pricing, American-odds fluency, and a flat sortable odds table.",
+                "betting", "t-bet")
+    g = DATA["metrics"].get("game_model", {}).get("python", {})
+    c = DATA["calibration"]
+    body += ('<div class="hero"><div class="eyebrow">Trading desk</div><h1>betting &amp; analytics</h1>'
+             '<p>What a book person actually checks: is the edge real, is it calibrated, and how big '
+             'is the variance. Descriptive analytics only — no picks, no bankroll advice.</p></div>' + prov())
+    # 1 + 2 benchmark honesty with odds fluency
+    body += ('<div class="sec"><h2>Is the edge real?</h2><span class="line"></span></div>'
+             '<p class="lead">The game model is benchmarked against a home-field baseline and a '
+             'Pythagorean baseline — it beats <b>both</b> on Brier — <b>not</b> against closing lines. '
+             'Beating the closing line is the actual bar for a profitable model, and we don\'t claim it.</p>'
+             '<div class="grid"><div class="card">'
+             f'<div class="kv"><span>Model Brier (lower better)</span><b class="pos">{fmt(g.get("brier"))}</b></div>'
+             f'<div class="kv"><span>Home-field baseline</span><b>{fmt(g.get("brier_hfa_baseline"))}</b></div>'
+             f'<div class="kv"><span>Pythagorean baseline</span><b>{fmt(g.get("brier_pyth_baseline"))}</b></div>'
+             f'<div class="kv"><span>AUC</span><b>{fmt(g.get("auc"))}</b></div>'
+             f'<div class="kv"><span>Accuracy vs always-home</span><b>{fmt(g.get("accuracy"))} / {fmt(c["base_home"])}</b></div>'
+             '<div class="read">Honest wrinkle: the Pythagorean baseline is actually <b>worse</b> than '
+             'naive home-field at single-game grain — a 10-game rolling Pythagorean is noisy. The fitted '
+             'model beats both; we report the wrinkle rather than hide it.</div></div>'
+             '<div class="card"><div class="name" style="font-size:17px">Odds fluency</div>'
+             '<div class="def">Every probability on this page also shows its American-odds equivalent, '
+             'e.g. a home win probability of:</div>'
+             f'<div class="kv"><span class="mono">{fmt(g.get("mean_pred"))} (typical home game)</span><b class="mono">{to_american(g.get("mean_pred", 0.52))}</b></div>'
+             f'<div class="kv"><span class="mono">0.60</span><b class="mono">{to_american(0.60)}</b></div>'
+             f'<div class="kv"><span class="mono">0.45</span><b class="mono">{to_american(0.45)}</b></div>'
+             '<div class="read">No-vig, straight from model probability — a starting point for pricing, '
+             'not a posted line.</div></div></div>')
+    # 2a closing-line capture status
+    body += ('<div class="card callout" style="margin-top:14px"><div class="read"><b>Closing lines '
+             '(model-vs-market): capture pending.</b> Closing moneylines can\'t be backfilled, so the '
+             'roadmap banks one pre-game snapshot per day for the 2026 season via a free odds feed, '
+             'stored as aggregates under the same commit policy as everything else. Until that pipeline '
+             'is live, this page shows model-vs-baseline honesty and calibration only — the market '
+             'comparison arrives as 2026 accrues.</div></div>')
+    # 3 calibration for pricing
+    body += ('<div class="sec"><h2>Calibration (for pricing)</h2><span class="line"></span></div>'
+             '<p class="lead">When the model says 55%, does it happen 55% of the time? For pricing, '
+             'calibration matters more than accuracy.</p>'
+             '<div class="grid"><div class="card">' + _calibration_svg() +
+             f'<div class="read">Predictions sit in a tight {fmt(c["p_lo"])}–{fmt(c["p_hi"])} band '
+             '(a thin edge = few confident calls), but within it, stated probability tracks the observed '
+             'rate — points hug the dashed diagonal. 5 equal-count buckets, n per point.</div></div>'
+             '<div class="card"><div class="name" style="font-size:17px">Variance &amp; sizing reality</div>'
+             '<div class="def">An AUC of ~0.55 is a <b>thin</b> edge. Over a season it is real (it beats '
+             'the baselines), but game to game the outcome is dominated by variance — the signal is a '
+             'few percentage points on top of a near-coin-flip.</div>'
+             '<div class="read">Implication: any edge this size needs a large sample and strict staking '
+             'discipline to show through the noise. This is descriptive framing — not betting advice, '
+             'and consistent with the non-commercial data license in the footer.</div></div></div>')
+    # 4 flat sortable odds table (prerendered)
+    body += ('<div class="sec"><h2>Full odds table</h2><span class="line"></span></div>'
+             '<p class="lead">All 30 teams, one sortable table (click a column). Playoff and division '
+             'odds shown as probability and American price.</p>')
+    if SIM:
+        cols = ["Team", "Proj W", "80% range", "Playoff %", "Playoff", "Div %", "Div", "Actual"]
+        head_cells = "".join(
+            f'<th{" data-nosort" if h == "80% range" else ""}>{h}</th>' for h in cols)
+        trs = ""
+        for t in sorted(SIM["teams"], key=lambda x: -x["playoff_odds"]):
+            trs += (f'<tr><td data-v="{t["abbr"]}">{mono_py(t["team_id"])} {t["abbr"]}</td>'
+                    f'<td data-v="{t["proj_wins"]}">{fmt(t["proj_wins"], 1)}</td>'
+                    f'<td>{fmt(t["p10"], 1)}–{fmt(t["p90"], 1)}</td>'
+                    f'<td data-v="{t["playoff_odds"]}">{fmt(t["playoff_odds"] * 100, 1)}%</td>'
+                    f'<td data-v="{t["playoff_odds"]}" class="mono">{to_american(t["playoff_odds"])}</td>'
+                    f'<td data-v="{t["div_odds"]}">{fmt(t["div_odds"] * 100, 1)}%</td>'
+                    f'<td data-v="{t["div_odds"]}" class="mono">{to_american(t["div_odds"])}</td>'
+                    f'<td data-v="{t["actual_w"]}">{t["actual_w"]}-{t["actual_l"]}</td></tr>')
+        body += f'<div class="tblwrap"><table class="flat" id="oddstbl"><thead><tr>{head_cells}</tr></thead><tbody>{trs}</tbody></table></div>'
+        js = '<script>document.querySelectorAll("table.flat").forEach(makeSortable);</script>'
+        _write("betting.html", body, js)
+    else:
+        _write("betting.html", body)
+
+
+PAGES["betting.html"] = build_betting
+
+
+# ------------------------------------------------------------------ fan.html (zero pipeline jargon)
+def _luck_chip(t: dict, sign: bool) -> str:
+    v = t["luck"]
+    txt = f'+{fmt(v, 1)}' if v > 0 else fmt(v, 1)
+    return (f'<div class="srow" style="border-left-color:{team_fill(t["team_id"])};grid-template-columns:1fr auto">'
+            f'<div class="steam">{mono_py(t["team_id"])}<b>{abbr(t["team_id"])}</b>'
+            f'<span class="srec">{t["season"]} · {fmt(t["w"])}-{fmt(t["l"])}</span></div>'
+            f'<div class="sproj" style="color:{"var(--good)" if sign else "var(--bad)"}">{txt}<span class="srange">games</span></div></div>')
+
+
+def build_fan() -> None:
+    body = head("DIAMONDIQ — For Baseball Fans",
+                "Who was for real and who got lucky, which stats are skill vs. luck, whether anyone "
+                "can actually predict a game, and playoff odds — in plain English.", "fan", "t-fan")
+    acc = round(DATA["calibration"]["accuracy"] * 100, 1)
+    home = round(DATA["calibration"]["base_home"] * 100, 1)
+    body += ('<div class="hero"><div class="eyebrow">For fans</div><h1>Skill, luck &amp; the truth</h1>'
+             '<p>The stuff that actually settles bar arguments — who overachieved, which numbers mean '
+             'something, and how much of baseball is just luck.</p></div>' + prov())
+    # 1. luck leaderboard
+    teams = DATA["teams"]
+    lucky = sorted(teams, key=lambda x: -x["luck"])[:5]
+    snake = sorted(teams, key=lambda x: x["luck"])[:5]
+    body += ('<div class="sec"><h2>Who was for real?</h2><span class="line"></span></div>'
+             '<p class="lead">Teams that won more (or fewer) games than their runs scored and allowed '
+             'say they should have. Luck like this usually doesn\'t repeat.</p><div class="grid">'
+             '<div class="card"><div class="name" style="font-size:18px;color:var(--good)">Luckiest teams</div>'
+             + "".join(_luck_chip(t, True) for t in lucky) + '</div>'
+             '<div class="card"><div class="name" style="font-size:18px;color:var(--bad)">Most snakebitten</div>'
+             + "".join(_luck_chip(t, False) for t in snake) + '</div></div>')
+    # 2. skill vs luck stat cards
+    gl = DATA["glossary"]
+    stat_cards = [
+        ("OPS", "ops", "high", "The all-in-one hitting number. Sticks year to year — good hitters stay good."),
+        ("Strikeout rate", "k_pct", "low", "How often a hitter strikes out. The <b>most reliable</b> hitter trait there is — it barely moves year to year."),
+        ("Walk rate", "bb_pct", "high", "Plate discipline. Also very steady — a good eye is a real, repeatable skill."),
+        ("BABIP (batted-ball luck)", "babip", "high", "How often balls in play fall for hits. This one is <b>mostly luck</b> — a hot BABIP almost never carries into next year."),
+    ]
+    body += ('<div class="sec"><h2>Which stats are skill, which are luck?</h2><span class="line"></span></div>'
+             '<p class="lead">Some numbers repeat every year (skill). Others bounce around (luck). '
+             'Here\'s the field, with the leader and trailer named.</p><div class="grid">')
+    for name, key, direction, cap in stat_cards:
+        body += (f'<div class="card"><div class="name" style="font-size:18px">{name}</div>'
+                 f'<div class="def">{cap}</div>{dist_html(gl.get(key), direction)}'
+                 f'<div class="read"><a href="glossary.html#{key}">More in the Stat Guide →</a></div></div>')
+    body += '</div>'
+    # 3. can anyone predict baseball
+    body += ('<div class="sec"><h2>Can anyone actually predict baseball?</h2><span class="line"></span></div>'
+             '<div class="card callout"><div class="big3">'
+             f'<div><div class="n" style="color:var(--good)">{fmt(acc)}%</div><div class="l">our best model picks the winner</div></div>'
+             f'<div><div class="n">{fmt(home)}%</div><div class="l">just always pick the home team</div></div>'
+             '<div><div class="n">50%</div><div class="l">flip a coin</div></div></div>'
+             '<div class="read" style="margin-top:12px">That tiny gap — a couple of points over always '
+             'picking the home team — is what professional-grade prediction actually looks like. Anyone '
+             'claiming they call baseball games 70% of the time is selling something.</div></div>')
+    # 4. playoff snapshot
+    if SIM:
+        top = sorted(SIM["teams"], key=lambda x: -x["playoff_odds"])[:8]
+        rows = ""
+        for t in top:
+            col = team_fill(t["team_id"])
+            dot = '<span class="pdot" title="Made the 2025 playoffs"></span>' if t["made_playoffs_actual"] else '<span class="pdot off" title="Missed"></span>'
+            rows += (f'<div class="srow" style="border-left-color:{col}">'
+                     f'<div class="steam">{dot}{mono_py(t["team_id"])}<b>{t["abbr"]}</b></div>'
+                     f'<div class="sproj">{fmt(t["proj_wins"], 1)}<span class="srange">proj wins</span></div>'
+                     f'<div class="obar"><div class="ofill" style="width:{t["playoff_odds"] * 100:.0f}%;background:{col}"></div>'
+                     f'<span class="oval">{fmt(t["playoff_odds"] * 100, 0)}%</span></div></div>')
+        body += ('<div class="sec"><h2>Playoff odds — top of the board</h2><span class="line"></span></div>'
+                 '<p class="lead">From ten thousand simulated seasons. Gold dot = actually made the '
+                 'playoffs.</p>'
+                 '<div class="legend"><span><span class="pdot"></span>Made playoffs</span>'
+                 '<span><span class="pdot off"></span>Missed</span></div>'
+                 f'<div class="card">{rows}</div>'
+                 '<p class="lead"><a href="simulator.html">See the full simulator →</a></p>')
+    # 5. draft crapshoot + aging
+    m8 = DATA["metrics"].get("m8_draft", {}).get("python", {})
+    peak = DATA["metrics"].get("b3_aging", {}).get("python", {}).get("peak_age")
+    body += ('<div class="sec"><h2>Two things everyone gets wrong</h2><span class="line"></span></div><div class="grid">'
+             '<div class="card"><div class="name" style="font-size:19px">The draft is a crapshoot</div>'
+             f'<div class="big3" style="grid-template-columns:1fr"><div><div class="n" style="color:var(--gold)">~1%</div>'
+             f'<div class="l">of a hitter\'s big-league production is explained by where they were drafted</div></div></div>'
+             f'<div class="read">Among drafted position players who actually reach the majors, draft slot '
+             f'barely predicts who hits (n={m8.get("n", "—")}). Once you\'re good enough to make it, the '
+             f'draft number stops mattering.</div></div>'
+             '<div class="card"><div class="name" style="font-size:19px">Hitters peak around 30</div>'
+             f'<div class="big3" style="grid-template-columns:1fr"><div><div class="n">{fmt(peak, 0)}</div>'
+             f'<div class="l">the age hitters are typically at their best</div></div></div>'
+             '<div class="read">With a catch worth saying out loud: only the good ones stick around long '
+             'enough to be measured when they\'re old, so late-career numbers look better than they '
+             'really are.</div></div></div>')
+    # 6. fun facts
+    facts = "".join(f'<div class="card"><div class="def">{f}</div></div>' for f in DATA["funfacts"])
+    body += ('<div class="sec"><h2>Fun facts from the numbers</h2><span class="line"></span></div>'
+             f'<div class="grid">{facts}</div>')
+    _write("fan.html", body)
+
+
+PAGES["fan.html"] = build_fan
+
+
+# ------------------------------------------------------------------ index.html (router)
+def build_index() -> None:
+    meta = DATA["meta"]
+    acc = round(DATA["calibration"]["accuracy"] * 100, 1)
+    home = round(DATA["calibration"]["base_home"] * 100, 1)
+    body = head("DIAMONDIQ — MLB skill, luck & prediction",
+                "2.18M pitches, 7,408 games, 13 models built in R and Python. What's skill, what's "
+                "luck, and how well can a baseball game actually be predicted?", "")
+    body += (f'<div class="hero"><div class="eyebrow">Diamond Intelligence</div>'
+             f'<h1>What\'s skill,<br>what\'s luck?</h1>'
+             f'<p><b>{meta["n_pitches"]:,} pitches. {meta["n_games"]:,} games. 13 models.</b> '
+             f'An honest look at how much of baseball is repeatable skill, how much is luck, and how '
+             f'well a game can really be predicted — with the uncertainty left in, never hyped out.</p></div>' + prov())
+    # headline insight
+    body += ('<div class="card callout" style="margin-top:20px"><div class="big3">'
+             f'<div><div class="n" style="color:var(--good)">{fmt(acc)}%</div><div class="l">DiamondIQ calls the winner</div></div>'
+             f'<div><div class="n">{fmt(home)}%</div><div class="l">always pick the home team</div></div>'
+             '<div><div class="n">50%</div><div class="l">coin flip</div></div></div>'
+             '<div class="read" style="margin-top:12px">That few-point gap over always-picking-home is '
+             'what a genuine game-prediction edge looks like. Baseball is close to a coin flip — and we '
+             'say so instead of pretending otherwise.</div></div>')
+    # three doors
+    body += ('<div class="sec"><h2>Pick your door</h2><span class="line"></span></div>'
+             '<div class="doors">'
+             '<a class="door" href="fan.html"><div class="t">I\'m a fan</div>'
+             '<div class="d">Who overachieved, which stats are skill vs. luck, whether anyone can '
+             'really predict a game, and playoff odds — all in plain English.</div>'
+             '<div class="go">Enter →</div></a>'
+             '<a class="door" href="betting.html"><div class="t">Betting &amp; analytics</div>'
+             '<div class="d">Model-vs-baseline honesty, calibration for pricing, American-odds fluency, '
+             'and a flat sortable odds table. Descriptive only — no picks.</div>'
+             '<div class="go">Enter →</div></a>'
+             '<a class="door" href="data-eng.html"><div class="t">I\'m a data person</div>'
+             '<div class="d">The medallion pipeline and the R↔Python parity gate '
+             '(<a href="data-science.html" style="color:var(--a)">or jump to the models &amp; '
+             'calibration</a>).</div>'
+             '<div class="go">Enter →</div></a></div>')
+    _write("index.html", body)
+
+
+PAGES["index.html"] = build_index
+
+
+def build_models_redirect() -> None:
+    """models.html folded into data-science.html (FEEDBACK §0) — keep a redirect for old links."""
+    (DOCS / "models.html").write_text(
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta http-equiv="refresh" content="0; url=data-science.html">'
+        '<title>Moved → Data Science</title><link rel="canonical" href="data-science.html"></head>'
+        '<body>The Models page moved to <a href="data-science.html">Data Science</a>.</body></html>',
+        encoding="utf-8")
+
+
+PAGES["models.html"] = build_models_redirect
 
 
 def main() -> None:

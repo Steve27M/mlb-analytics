@@ -95,7 +95,7 @@ def main() -> None:
                round(s.games * pow(s.rs,{e})/(pow(s.rs,{e})+pow(s.ra,{e})), 1) as pyth_w,
                round(s.w - s.games * pow(s.rs,{e})/(pow(s.rs,{e})+pow(s.ra,{e})), 1) as luck
         from gold.gold_team_season s join gold.dim_team t on t.team_id = s.team_id
-        order by s.season, win_pct desc
+        order by s.season, win_pct desc, t.team_id
     """).fetch_df().to_dict(orient="records")
 
     site = {"meta": meta, "provenance": provenance, "dq": dq, "teams": teams,
@@ -183,6 +183,7 @@ def _h2h(con) -> dict:
         from gold.fct_game
         where game_type = 'R' and winner_team_id is not null
         group by 1, 2, 3
+        order by 1, 2, 3
     """).fetchall()
     d: dict = {}
     for season, a, b, aw, bw in rows:
