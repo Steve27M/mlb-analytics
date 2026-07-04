@@ -24,7 +24,7 @@ def _parse_year(year: int) -> list[dict]:
     data = get_json(API, params={
         "action": "parse", "page": f"{year} Major League Baseball draft",
         "format": "json", "prop": "text",
-    }, throttle=1.0)  # <= 1 req/sec (Wikipedia politeness)
+    }, throttle=2.0)  # gentle on Wikipedia's parse API; 429s honor Retry-After (see _common)
     html = data.get("parse", {}).get("text", {}).get("*", "")
     soup = BeautifulSoup(html, "lxml")
 

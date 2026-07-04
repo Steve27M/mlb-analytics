@@ -80,6 +80,11 @@ def get_json(url: str, params: dict | None = None, throttle: float = 0.5) -> dic
     time.sleep(throttle)
     resp = requests.get(url, params=params, headers={"User-Agent": user_agent()}, timeout=30)
     if resp.status_code == 429 or resp.status_code >= 500:
+        # Honor a server-supplied cool-down (Wikipedia sends Retry-After on 429). Without this,
+        # a rate-limit block longer than the exponential backoff exhausts the retries and aborts.
+        ra = resp.headers.get("Retry-After", "")
+        if resp.status_code == 429 and ra.isdigit():
+            time.sleep(min(int(ra), 60))
         raise HttpError(f"{resp.status_code} for {resp.url}")
     resp.raise_for_status()
     return resp.json()
