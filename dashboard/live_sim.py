@@ -133,6 +133,20 @@ def main() -> None:
     payload = {"n_sim": N_SIM, "seed": SEED, "season": LIVE_SEASON, "n_remaining": int(n_rem),
                "games_played": int(cur_w.sum()), "teams": rows}
     (OUT / "live_sim.json").write_text(json.dumps(payload))
+    # Export the frozen model coefficients + each team's current form for the CLIENT-SIDE live page
+    # (live.html computes win probability in the browser; no backend). Keyed by MLBAM team_id, which
+    # is exactly what the GUMBO live feed returns for home/away teams.
+    tmeta = {int(r["team_id"]): r["team_abbr"] for _, r in ref.iterrows()}
+    model = {
+        "coefs": {"const": round(float(coefs[0]), 5), "off": round(float(coefs[1]), 5),
+                  "def": round(float(coefs[2]), 5), "win": round(float(coefs[3]), 5)},
+        "teams": {int(tid): {"abbr": tmeta.get(int(tid), "?"),
+                             "off": round(float(f["roll_off_run_value"]), 5),
+                             "def": round(float(f["roll_def_run_value"]), 5),
+                             "win_pct": round(float(f["roll_win_pct"]), 5)}
+                  for tid, f in form.iterrows() if int(tid) in pos},
+    }
+    (OUT / "live_model.json").write_text(json.dumps(model))
     print(json.dumps({"stage": "live_sim", "event": "simulated", "season": LIVE_SEASON,
                       "n_remaining": int(n_rem), "leaders": [r["abbr"] for r in rows[:4]]}))
 

@@ -23,6 +23,8 @@ _SIM_PATH = REPO / "data" / "dashboard" / "season_sim.json"
 SIM = json.loads(_SIM_PATH.read_text()) if _SIM_PATH.exists() else None
 _LIVE_PATH = REPO / "data" / "dashboard" / "live_sim.json"
 LIVE = json.loads(_LIVE_PATH.read_text()) if _LIVE_PATH.exists() else None
+_LMODEL_PATH = REPO / "data" / "dashboard" / "live_model.json"
+LIVE_MODEL = json.loads(_LMODEL_PATH.read_text()) if _LMODEL_PATH.exists() else None
 DOCS = REPO / "docs"
 ASSETS = DOCS / "assets"
 GH = "https://github.com/Steve27M/mlb-analytics"
@@ -326,7 +328,7 @@ def teams_js() -> str:
 # ------------------------------------------------------------------ shared chrome
 NAVITEMS = [("fan", "Fans"), ("betting", "Betting"), ("data-eng", "Data Eng"),
             ("data-science", "Data Science"), ("compare", "Compare"),
-            ("simulator", "Simulator"), ("glossary", "Stat Guide")]
+            ("simulator", "Simulator"), ("live", "Live"), ("glossary", "Stat Guide")]
 
 
 def nav(active: str) -> str:
@@ -708,6 +710,97 @@ def chip_leader(t: dict) -> str:
 
 
 PAGES["simulator.html"] = build_simulator
+
+
+# ------------------------------------------------------------------ live.html (real-time exhibit)
+def build_live() -> None:
+    body = head("DIAMONDIQ — Live Win Probability",
+                "Real-time game-day win probability: the browser polls MLB's public live feed and "
+                "computes each game's win probability client-side. No backend.", "live", "t-eng")
+    body += ('<div class="hero"><div class="eyebrow">Real time</div><h1>live win probability</h1>'
+             '<p>During games, your browser polls MLB\'s public live feed every ~18 seconds and computes '
+             'each game\'s win probability <b>right here in the page</b> — no server, no backend. This is '
+             'the real-time leg of the pipeline, at $0.</p></div>')
+    body += ('<div class="prov" id="livestat">Connecting to the live feed…</div>')
+    body += ('<div class="card callout" style="margin-top:14px"><div class="read"><b>What the number is '
+             '(honest):</b> a <b>pregame-features model updated with the score and inning</b> — not a '
+             'fully trained in-game model. Early on it reflects the two teams\' form; as the game '
+             'progresses the score takes over. Descriptive analytics, <b>not a betting pick</b>. If '
+             'gambling stops being fun, help is free: <b>1-800-GAMBLER</b>.</div></div>')
+    # prerendered no-JS / loading state
+    body += ('<div id="live"><div class="card"><div class="def">Loading today\'s games… '
+             '<noscript>This live page needs JavaScript to poll the feed. See the '
+             '<a href="simulator.html">season simulator</a> for the static projection.</noscript>'
+             '</div></div></div>')
+    # the ADR, on the page (per §3)
+    body += ('<div class="sec"><h2>Why polling, not push</h2><span class="line"></span></div><div class="grid">'
+             '<div class="card"><div class="name" style="font-size:16px">Client polling (chosen)</div>'
+             '<div class="def">Each browser polls the feed directly. <b>Zero infrastructure</b>, the page '
+             'stays static. Cost: N viewers = N pollers, so rate-limit exposure scales with traffic.</div></div>'
+             '<div class="card"><div class="name" style="font-size:16px">SSE fan-out (deferred)</div>'
+             '<div class="def">One upstream poller on an edge-worker free tier pushes to all clients — '
+             'server-side rate control, but standing infrastructure and a deploy surface for a demo page. '
+             '<b>Revisit trigger:</b> sustained concurrent viewers or first rate-limit contact. '
+             '(<a href="' + GH + '/blob/main/ARCHITECTURE.md">ADR-4</a>).</div></div></div>')
+    js = ("""<script>const MODEL=""" + json.dumps(LIVE_MODEL or {"coefs": {}, "teams": {}}) + """;
+(function(){
+ const SCHED="https://statsapi.mlb.com/api/v1/schedule?sportId=1";
+ const FEED=pk=>"https://statsapi.mlb.com/api/v1.1/game/"+pk+"/feed/live";
+ const POLL=18000, el=document.getElementById('live'), stat=document.getElementById('livestat');
+ let backoff=0,lastOk=null; const etags={};
+ const sig=x=>1/(1+Math.exp(-x));
+ const t2=d=>d.toTimeString().slice(0,5);
+ function wp(hId,aId,hR,aR,inn,half,outs){
+   const h=MODEL.teams[hId],a=MODEL.teams[aId],C=MODEL.coefs; if(!h||!a) return null;
+   const pre=C.const+C.off*(h.off-a.off)+C.def*(h.def-a.def)+C.win*(h.win_pct-a.win_pct);
+   const om=((inn-1)*2+((half==='Bottom'||half==='B')?1:0))*3+(outs||0);
+   const g=Math.max(0,Math.min(1,om/48)), lead=hR-aR;
+   return sig(pre*(1-g)+lead*(0.35+1.6*g));
+ }
+ async function getJSON(url){ const o={headers:{}}; if(etags[url])o.headers['If-None-Match']=etags[url];
+   const r=await fetch(url,o); if(r.status===304)return null; if(!r.ok)throw new Error('HTTP '+r.status);
+   const et=r.headers.get('ETag'); if(et)etags[url]=et; return r.json(); }
+ function bar(p,col){ return `<div class="obar"><div class="ofill" style="width:${(p*100).toFixed(0)}%;background:${col}"></div><span class="oval">${(p*100).toFixed(0)}%</span></div>`; }
+ function tm(id){ const m=MODEL.teams[id]; return m?m.abbr:'?'; }
+ // re-derive state from the FULL feed each poll (never diff) so corrected/challenged calls self-heal
+ function renderGame(g,feed){
+   const hId=g.teams.home.team.id,aId=g.teams.away.team.id;
+   const ls=feed&&feed.liveData&&feed.liveData.linescore||{};
+   const hR=(ls.teams&&ls.teams.home&&ls.teams.home.runs)||0, aR=(ls.teams&&ls.teams.away&&ls.teams.away.runs)||0;
+   const inn=ls.currentInning||1, half=ls.inningState||'Top', outs=ls.outs||0;
+   const p=wp(hId,aId,hR,aR,inn,half,outs);
+   const state = feed?`${half} ${inn}, ${outs} out${outs===1?'':'s'}`:'live';
+   const line = p===null?'<span style="color:var(--sub)">team form unavailable</span>':bar(p,'var(--a)');
+   return `<div class="card"><div class="kv"><span><b>${tm(aId)}</b> ${aR} &nbsp;@&nbsp; <b>${tm(hId)}</b> ${hR}</span><span class="mono" style="color:var(--sub)">${state}</span></div>
+     <div style="margin-top:6px">${line}</div>
+     <div class="read" style="font-size:12px">${tm(hId)} (home) win probability</div></div>`;
+ }
+ function off(nGames,next){
+   const msg=nGames? 'No games are live right now.' : 'No games scheduled today.';
+   const nx=next?` Next first pitch: ${next.toLocaleString()}.`:'';
+   return `<div class="card"><div class="name" style="font-size:17px">All quiet</div><div class="def">${msg}${nx} This page wakes up when games go live.</div></div>`;
+ }
+ async function tick(){
+   try{
+     const today=new Date().toISOString().slice(0,10);
+     const sc=await getJSON(SCHED+"&date="+today);
+     if(sc){ const games=(sc.dates&&sc.dates[0]&&sc.dates[0].games)||[];
+       const live=games.filter(g=>g.status.abstractGameState==='Live');
+       if(!live.length){ const nx=games.find(g=>g.status.abstractGameState==='Preview'); el.innerHTML=off(games.length,nx?new Date(nx.gameDate):null); }
+       else { const out=[]; for(const g of live){ let f=null; try{f=await getJSON(FEED(g.gamePk));}catch(e){} out.push(renderGame(g,f)); } el.innerHTML=`<div class="grid">${out.join('')}</div>`; }
+     }
+     lastOk=new Date(); backoff=0; stat.textContent='Live · updated '+t2(lastOk); stat.style.borderLeftColor='var(--good)';
+   }catch(e){ backoff=Math.min(backoff*2||POLL,120000);
+     stat.textContent=lastOk?('Feed stale since '+t2(lastOk)+' — retrying'):'Cannot reach the live feed — retrying'; stat.style.borderLeftColor='var(--bad)'; }
+   setTimeout(tick, backoff||POLL);
+ }
+ tick();
+})();
+</script>""")
+    _write("live.html", body, js)
+
+
+PAGES["live.html"] = build_live
 
 
 # ------------------------------------------------------------------ data-science.html
