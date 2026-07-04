@@ -991,13 +991,15 @@ def build_betting() -> None:
              f'<div class="kv"><span class="mono">0.45</span><b class="mono">{to_american(0.45)}</b></div>'
              '<div class="read">No-vig, straight from model probability — a starting point for pricing, '
              'not a posted line.</div></div></div>')
-    # 2a closing-line capture status
+    # 2a closing-line capture status (retrospective, settled-games only — no live picks published)
     body += ('<div class="card callout" style="margin-top:14px"><div class="read"><b>Closing lines '
-             '(model-vs-market): capture pending.</b> Closing moneylines can\'t be backfilled, so the '
-             'roadmap banks one pre-game snapshot per day for the 2026 season via a free odds feed, '
-             'stored as aggregates under the same commit policy as everything else. Until that pipeline '
-             'is live, this page shows model-vs-baseline honesty and calibration only — the market '
-             'comparison arrives as 2026 accrues.</div></div>')
+             '(model-vs-market): capture is live, comparison accrues.</b> Closing moneylines can\'t be '
+             'backfilled, so we now bank one pre-game snapshot per day of the 2026 season. The raw '
+             'lines stay private; only a <b>retrospective, settled-games</b> comparison is published — '
+             'after each game finishes, what the model said vs. what the market priced vs. what actually '
+             'happened. <b>No live picks, no advice</b> — this is a calibration/accuracy record, not a '
+             'tip sheet. The model-vs-market table fills in as 2026 games settle. Market odds: '
+             '<a href="https://the-odds-api.com">The Odds API</a>.</div></div>')
     # 3 calibration for pricing
     body += ('<div class="sec"><h2>Calibration (for pricing)</h2><span class="line"></span></div>'
              '<p class="lead">When the model says 55%, does it happen 55% of the time? For pricing, '
