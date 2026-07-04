@@ -4,8 +4,10 @@
 once in Python — and refuses to ship unless the two languages agree.**
 
 Statcast + statsapi → DuckDB (medallion → Kimball star, daily-grain SCD2) → **13 models in
-R *and* Python behind an enforced parity gate** → a static [DIAMONDIQ dashboard](docs/) on
-GitHub Pages. Built to be lifted to AWS free tier (Phase 6).
+R *and* Python behind an enforced parity gate** → a static DIAMONDIQ dashboard on GitHub Pages.
+Built to be lifted to AWS free tier (Phase 6).
+
+### 🔗 Live dashboard: **https://steve27m.github.io/mlb-analytics/**
 
 > **Status:** Phases 0–5 complete. 2.18M pitches across 2023–2025, 27 warehouse tables,
 > 50 dbt data tests, **13/13 models green on the parity gate** (exact / label-invariant /
