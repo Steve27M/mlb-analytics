@@ -108,7 +108,7 @@ def main() -> None:
     site = {"meta": meta, "provenance": provenance, "dq": dq, "teams": teams,
             "metrics": metrics, "glossary": _glossary(con),
             "calibration": _calibration(), "stability": _stability(con),
-            "h2h": _h2h(con), "funfacts": _funfacts(con, e)}
+            "h2h": _h2h(con), "funfacts": _funfacts(con, e), "effects": _effects()}
     (OUT / "site_data.json").write_text(json.dumps(site, default=float))
     print(json.dumps({"stage": "dashboard", "event": "prepared", "tables": len(dq_tables),
                       "teams": len(teams), "models": len(metrics),
@@ -158,6 +158,49 @@ def _calibration() -> dict:
     return {"buckets": buckets, "accuracy": round(acc, 3),
             "base_home": round(float(te["home_win"].mean()), 3),
             "p_lo": round(float(te["p"].min()), 3), "p_hi": round(float(te["p"].max()), 3)}
+
+
+def _effects() -> dict:
+    """Effect-size numbers with uncertainty (Funder & Ozer 2019 framing): bootstrap CIs + concrete
+    odds translations, so no finding is ever reported as bare r^2. Fixed seed -> reproducible."""
+    import numpy as np
+    import pandas as pd
+    import statsmodels.api as sm
+    rng = np.random.default_rng(2026)
+    # M8 draft: r + bootstrap CI + concordance (P a higher pick out-produces a lower pick)
+    d = pd.read_parquet(f"{GOLD}/draft_production.parquet")
+    pk, ops = d["pick"].to_numpy(), d["ops"].to_numpy()
+    n8 = len(d)
+    r8 = float(np.corrcoef(pk, ops)[0, 1])
+    boot = [np.corrcoef(pk[i], ops[i])[0, 1]
+            for i in (rng.integers(0, n8, n8) for _ in range(2000))]
+    lo8, hi8 = (float(x) for x in np.percentile(boot, [2.5, 97.5]))
+    concord = float(0.5 + np.arcsin(-r8) / np.pi)   # earlier pick = lower number
+    # game model: Brier improvement over home-field baseline + bootstrap CI
+    feat = ["off_rv_diff", "def_rv_diff", "win_pct_diff"]
+    g = pd.read_parquet(f"{GOLD}/game_features.parquet")
+    tr = g[g["season"].isin([2023, 2024])]
+    te = g[g["season"] == 2025].copy()
+    m = sm.GLM(tr["home_win"], sm.add_constant(tr[feat]), family=sm.families.Binomial()).fit()
+    p = m.predict(sm.add_constant(te[feat])).to_numpy()
+    y = te["home_win"].to_numpy()
+    base = float(tr["home_win"].mean())
+    ng = len(y)
+    deltas = []
+    for _ in range(2000):
+        idx = rng.integers(0, ng, ng)
+        deltas.append(np.mean((base - y[idx]) ** 2) - np.mean((p[idx] - y[idx]) ** 2))
+    dlo, dhi = (float(x) for x in np.percentile(deltas, [2.5, 97.5]))
+    return {
+        "m8": {"r": round(r8, 3), "ci": [round(lo8, 3), round(hi8, 3)], "n": n8,
+               "concordance": round(concord * 100, 0)},
+        "game": {"brier": round(float(np.mean((p - y) ** 2)), 4),
+                 "brier_hfa": round(float(np.mean((base - y) ** 2)), 4),
+                 "delta": round(float(np.mean((base - y) ** 2) - np.mean((p - y) ** 2)), 4),
+                 "delta_ci": [round(dlo, 4), round(dhi, 4)],
+                 "accuracy": round(float(((p >= 0.5) == y).mean()) * 100, 1),
+                 "base_home": round(float(y.mean()) * 100, 1), "n_games": ng},
+    }
 
 
 def _stability(con) -> dict:

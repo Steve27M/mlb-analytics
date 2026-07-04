@@ -156,3 +156,46 @@ never committed. Verdict: **APPROVED** for banking 2026 pre-game moneyline (h2h)
 - **Good-citizen:** descriptive UA, throttle + backoff, one small non-bulk pull/day; descriptive
   analytics only (the betting page carries a "no betting advice" disclaimer); no PII.
 - Terms reviewed at https://the-odds-api.com/terms-and-conditions.html on 2026-07-04.
+
+## 10. POST-FLIGHT — legal & ethical compliance review (reviewed as of 2026-07-04)
+
+Per FEEDBACK2 §8, a full compliance review run after the Phase-3 changes. Rendered as a
+"compliance reviewed 2026-07-04" line in the site footer of every page (links here).
+
+- **Data sources — re-verified against actual usage.**
+  - *MLBAM (statsapi / Baseball Savant):* nightly INCREMENTAL pulls (idempotent, throttled, backoff,
+    descriptive UA); 2023-2025 cache-hit, only the 2026 delta fetched. Individual, non-commercial,
+    non-bulk. **No raw/row-level redistribution** — bronze/warehouse are gitignored; only aggregates
+    + code committed. COMPLIANT (§1-2).
+  - *MLB GUMBO live feed* (`statsapi.mlb.com/api/v1.1/game/{pk}/feed/live`, planned for live.html):
+    SAME MLBAM host and terms as statsapi (§1) — no separate pre-flight needed, but two live-specific
+    guards REQUIRED when live.html ships: client polling throttled to 15-20s, and the client-fan-out
+    rate-limit exposure is documented with a revisit trigger (ARCHITECTURE.md ADR-4). Displays
+    professional on-field data only. NOTE: live.html not yet built — activate these guards on build.
+  - *The Odds API:* only DERIVED aggregates published (model-vs-market comparison); raw per-book
+    moneylines stay private/gitignored; not resold/redistributed as a standalone data product; key
+    is a repo secret, never committed. COMPLIANT (§9). Attributed in the footer.
+- **IP.** No club logos/marks anywhere — the published site has ZERO raster images and no logo files;
+  team identity is colors + typographic monograms only (teams.js, 30 entries, 0 external URLs).
+  Wordmarks (team names) used referentially. Footer disclaimer on all 8 content pages. COMPLIANT.
+- **Gambling-adjacent content.** betting.html is DESCRIPTIVE analytics only — no staking, sizing, or
+  bankroll advice; no jurisdiction-specific claims. A responsible-gambling line (1-800-GAMBLER,
+  ncpgambling.org) is present. When live.html ships it must carry the same disclaimer + responsible-
+  gambling line. COMPLIANT (with the live.html follow-through noted).
+- **Citation integrity.** Funder & Ozer (2019) cited with the full reference on data-science.html and
+  short-cited on betting.html, with a working DOI. Their argument is represented FAITHFULLY, including
+  where it pushes AGAINST this project's original framing — the M8 write-up was rewritten to drop the
+  "explains ~1% of variance" (r^2) claim the paper argues against, replaced with r translated to odds
+  + a bootstrap CI + a range-restriction disclosure. No paraphrase drifts into misattribution.
+- **Privacy.** Draft dataset is public-record professional data (Wikipedia, CC BY-SA); 247Sports /
+  Rivals were rejected earlier over ToS + minor-PII. No minor-PII entered via any Phase-3 source; the
+  live feed shows professional on-field data only. COMPLIANT.
+- **Ops honesty (applies when the observability layer ships).** ops.html / SPC / the incident log are
+  NOT yet built. When they are: the incident log must contain REAL entries (not curated green), and
+  SPC physical canaries (e.g. league mean fastball velocity) must expose only published aggregates —
+  no row-level data. Flagged as a build-time requirement.
+
+**Verdict:** COMPLIANT as of 2026-07-04. Two forward requirements when the unbuilt pieces ship:
+(1) live.html — polling throttle + client fan-out guard + gambling disclaimer/responsible-gambling
+line; (2) ops.html — honest (non-curated) incident log + aggregate-only SPC canaries. Re-review at
+that point.

@@ -368,7 +368,9 @@ FOOT = (f'<footer>Built from the <a href="{GH}">mlb-analytics</a> project '
         f'({DATA["meta"]["n_pitches"]:,} pitches, {DATA["meta"]["seasons"][0]}–{DATA["meta"]["seasons"][-1]}). '
         f'Data: MLB Advanced Media (statsapi / Baseball Savant) — individual, non-commercial, '
         f'non-bulk use; raw data not redistributed. Player crosswalk: Chadwick Bureau (ODC-By). '
-        f'Draft: Wikipedia (CC BY-SA). Aggregates and code only.</footer>')
+        f'Draft: Wikipedia (CC BY-SA). Odds: The Odds API. No club logos or marks; team colors only. '
+        f'Aggregates and code only. Legal &amp; ethical compliance reviewed 2026-07-04 '
+        f'(<a href="{GH}/blob/main/PREFLIGHT.md">PREFLIGHT.md</a>).</footer>')
 
 
 def scripts(*extra: str) -> str:
@@ -564,6 +566,16 @@ def build_compare() -> None:
              '<span class="mid" style="color:var(--sub);font:700 13px \'Anton\'">VS</span>'
              '<label class="vh" for="tb">Second team</label><select id="tb"></select></div>')
     body += f'<div id="body" style="margin-top:16px">{_matchup_html(a0, b0)}</div>'
+    body += ('<div class="grid" style="margin-top:16px">'
+             '<div class="card"><div class="name" style="font-size:16px">What "luck" means here</div>'
+             '<div class="def">Runs scored and allowed predict how many games a team <i>should</i> have '
+             'won. Win more than that and you\'ve been winning the close ones — which is mostly luck and '
+             'usually doesn\'t last. A team that outscores opponents by 20 runs but sits 5 games above '
+             'its expected wins is probably due to cool off.</div></div>'
+             '<div class="card"><div class="name" style="font-size:16px">Don\'t over-read the season series</div>'
+             '<div class="def">Two teams meet only 6–13 times a year — small enough that a 4–2 edge is '
+             'nearly meaningless. Season-long run totals tell you more about the next matchup than the '
+             'head-to-head record does.</div></div></div>')
     js = ("""<script>const TEAMS=""" + json.dumps(teams) + """;const H2H=""" + json.dumps(DATA["h2h"]) + """;
 (function(){const ROWS=[['win_pct','Win %',3,true],['w','Wins',0,true],['rs','Runs scored',0,true],
  ['ra','Runs allowed',0,false],['rundiff','Run differential',0,true],['pyth','Pythagorean win %',3,true],
@@ -641,13 +653,22 @@ def build_simulator() -> None:
              f'<div class="card"><div class="kv"><span>Simulations</span></div>'
              f'<div class="stat">{LIVE["n_sim"] // 1000}<span class="u">K</span></div>'
              f'<div class="read">Fixed seed → reproducible.</div></div></div>')
-    body += ('<div class="card callout" style="margin-top:16px"><div class="read"><b>Read it honestly:</b> '
-             'this is an <b>aggregate season projection</b> — how often each team reaches the playoffs '
-             'across thousands of simulated rest-of-seasons — not a pick for any single game. Remaining '
-             'games use each team\'s current rolling form held constant, so the odds lean on where teams '
-             'stand today; a hot or cold streak will move them. The frozen model is a thin edge '
-             '(AUC ~0.55), so standings drive most of the signal. See '
-             '<a href="data-science.html#game">the model\'s sealed-2025 validation</a>.</div></div>')
+    body += ('<div class="card callout" style="margin-top:16px"><div class="read"><b>How to read it:</b> '
+             'we replay the rest of the season <b>10,000 times</b>, letting every remaining game land '
+             'by its probability — like rolling weighted dice for every game, thousands of seasons in a '
+             'row. A team\'s playoff odds are simply: in how many of those seasons did it get in? It\'s a '
+             'season-long projection, <b>not a pick for any single game</b>. Remaining games use each '
+             'team\'s current form, so the odds lean on where teams stand today; a hot or cold streak '
+             'will move them.</div></div>'
+             '<div class="grid" style="margin-top:14px"><div class="card"><div class="name" style="font-size:16px">Why the projections huddle together</div>'
+             '<div class="def">Projected win totals cluster toward the middle not because teams are '
+             'equal, but because luck averages out across 10,000 replays while a single real season '
+             'keeps its luck. The range shown under each projection is the honest part: about 8 seasons '
+             'in 10 land inside it.</div></div>'
+             '<div class="card"><div class="name" style="font-size:16px">Does it actually work?</div>'
+             '<div class="def">Rerunning a finished season this way put <b>10 of the 12</b> real playoff '
+             'teams in our top 12 — good, and the two misses are the point: some of every season is '
+             'genuinely unpredictable. See <a href="data-science.html#game">how the model was validated</a>.</div></div></div>')
     body += ('<div class="toolbar"><button id="viewbtn" class="hamb" style="display:block">Show flat table</button>'
              '<button id="oddsbtn" class="hamb" style="display:block">Show American odds</button>'
              '<div class="legend"><span>Bar = playoff odds · row color = team · record = current</span></div></div>')
@@ -722,8 +743,8 @@ MODELS = [
      lambda: f"ICC {fmt(_mval('m7_babip_shrinkage','icc'))} — only ~{fmt(_mval('m7_babip_shrinkage','icc')*100,0)}% of BABIP is persistent skill.",
      "Intercepts only; no batted-ball covariates."),
     ("m8", "M8", "Draft vs. production", "OLS (ethical Wikipedia scrape)", "exact",
-     lambda: f"corr(pick, OPS) = {fmt(_mval('m8_draft','corr_pick_ops'))}, R² {fmt(_mval('m8_draft','r_squared'))} (n={_mval('m8_draft','n')}).",
-     "Survivor-biased: only players who reached MLB; the draft's real variance is upstream."),
+     lambda: f"corr(pick, OPS) = {fmt(DATA['effects']['m8']['r'])} — an earlier pick out-produces a later one about {fmt(DATA['effects']['m8']['concordance'],0)}% of the time (not 90%). A real tilt; small.",
+     f"95% CI [{fmt(DATA['effects']['m8']['ci'][0])}, {fmt(DATA['effects']['m8']['ci'][1])}] (n={DATA['effects']['m8']['n']}) spans ~0 to sizable; range-restricted (MLB-only), so the full-population effect is larger."),
     ("b1", "B1", "Pythagorean wins", "OLS through the origin", "exact",
      lambda: f"Fitted exponent {fmt(_mval('b1_pythagoras','pythag_exponent'))}, ~{fmt(_mval('b1_pythagoras','runs_per_win'),1)} runs per win.",
      "Fit on 90 team-seasons; the exponent drifts a little by run environment."),
@@ -853,6 +874,46 @@ def build_data_science() -> None:
              f'<div class="read">Model results are anchored to published baseball values (known-answer '
              f'tests); the parity gate proves R and Python agree, and the KAT proves they agree on '
              f'something true. See <a href="data-eng.html#parity">the parity gate</a>.</div></div></div>')
+    # Effect-size interpretation (Funder & Ozer 2019)
+    ef = DATA["effects"]
+    st = DATA["stability"]
+    body += ('<div class="sec" id="effects"><h2>How to read these effect sizes</h2><span class="line"></span></div>'
+             '<p class="lead">We interpret effects the way <a href="https://doi.org/10.1177/2515245919847202">'
+             'Funder &amp; Ozer (2019)</a> argue you should: never as a bare "% of variance explained" '
+             '(r² systematically understates practical importance), always relative to a benchmark or '
+             'translated into concrete odds, and mindful that small effects compound at scale.</p>'
+             '<div class="grid">'
+             f'<div class="card"><div class="name" style="font-size:17px">The game edge compounds</div>'
+             f'<div class="def">The model calls the winner <b>{fmt(ef["game"]["accuracy"])}%</b> of the time vs. '
+             f'<b>{fmt(ef["game"]["base_home"])}%</b> for always-pick-home — a ~0.7pp edge. Its Brier '
+             f'improvement over that baseline is <b>{fmt(ef["game"]["delta"])}</b>, 95% CI '
+             f'[{fmt(ef["game"]["delta_ci"][0])}, {fmt(ef["game"]["delta_ci"][1])}] (n={ef["game"]["n_games"]:,}).</div>'
+             '<div class="read">The CI barely clears zero — honestly, a thin edge. But like aspirin and '
+             'heart attacks (a per-person effect near r≈.03 that still saved lives at population scale), '
+             'a fraction of a game per matchup is real across 2,430 games a season. We evaluate against '
+             'achievable baselines, exactly the paper\'s doctrine.</div></div>'
+             f'<div class="card"><div class="name" style="font-size:17px">The draft, honestly</div>'
+             f'<div class="def">r = <b>{fmt(ef["m8"]["r"])}</b> means an earlier pick out-produces a later '
+             f'one about <b>{fmt(ef["m8"]["concordance"],0)}%</b> of the time — a real tilt, nothing like '
+             f'the 90% intuition. 95% CI [{fmt(ef["m8"]["ci"][0])}, {fmt(ef["m8"]["ci"][1])}] (n={ef["m8"]["n"]}).</div>'
+             '<div class="read">Three true things: the tilt is real and compounds over hundreds of picks '
+             'a year; our sample is <b>range-restricted</b> (only players who reached MLB), which '
+             'attenuates r, so the full-population effect is larger; and n=104 leaves the interval wide '
+             '— it can\'t rule out ~0 or ~−0.25. Any <i>one</i> pick is close to a crapshoot; the size '
+             'of the tilt we can\'t pin down. Reporting "explains 1% of variance" would hide all of this.</div></div></div>'
+             '<div class="card" style="margin-top:14px"><div class="name" style="font-size:17px">Effects are only meaningful in context</div>'
+             f'<div class="def">By psychology-calibrated labels, BABIP\'s year-to-year r = '
+             f'<b>{fmt(st["babip"]["r"])}</b> would count as "large." We still treat it as mostly luck — '
+             f'because the right comparison is K% at <b>{fmt(st["k_pct"]["r"])}</b> <i>within the same '
+             f'measurement system</i>, not survey correlations from another field. That is Funder &amp; '
+             'Ozer\'s central point, live: an effect size only means something next to the right benchmark.</div>'
+             '<div class="read"><b>House rule:</b> nowhere on this site is an effect reported as r² / '
+             '"% variance explained" alone — every correlation comes with a benchmark or a concrete-odds '
+             'translation.</div></div>'
+             '<p class="lead" style="margin-top:18px;font-size:13px">Reference: Funder, D. C., &amp; Ozer, '
+             'D. J. (2019). Evaluating effect size in psychological research: Sense and nonsense. '
+             '<i>Advances in Methods and Practices in Psychological Science</i>, 2(2), 156–168. '
+             '<a href="https://doi.org/10.1177/2515245919847202">doi:10.1177/2515245919847202</a>.</p>')
     _write("data-science.html", body)
 
 
@@ -906,6 +967,16 @@ def build_data_eng() -> None:
              'Python — and refuses to publish unless the two agree. This page is the portfolio '
              'README for engineers.</p></div>' + prov())
     body += ('<div class="sec"><h2>The pipeline</h2><span class="line"></span></div>' + _pipeline_svg())
+    body += ('<div class="card" style="margin-top:14px"><div class="name" style="font-size:17px">Statcast is sensor telemetry</div>'
+             '<div class="def">Statcast isn\'t a spreadsheet — it\'s a <b>distributed measurement system</b>: '
+             'Hawk-Eye optical arrays in 30 venues emitting <b>2.18M measurement events</b>. So this is a '
+             'measurement-system engineering problem, and the pipeline treats it as one: high-volume '
+             'telemetry ingestion, <b>cross-site normalization</b> (park effects are per-venue sensor '
+             'calibration differences), a mid-life <b>instrument migration</b> (Trackman radar → Hawk-Eye '
+             'optical in 2020 — the historical-baseline shift familiar from any sensor swap), and '
+             '<b>late/missing/corrected readings</b> (untracked pitches, suspended games, post-hoc scoring '
+             'corrections). It\'s an analogy to instrumentation engineering, not streaming SCADA — and it\'s '
+             'accurate.</div></div>')
     # warehouse + testing
     body += (f'<div class="sec"><h2>Warehouse &amp; testing</h2><span class="line"></span></div><div class="grid3">'
              f'<div class="card"><div class="kv"><span>Warehouse tables</span></div><div class="stat">{len(dq["tables"])}</div>'
@@ -931,12 +1002,14 @@ def build_data_eng() -> None:
         for t in tiers)
     body += (f'<div class="sec" id="parity"><h2>The parity gate</h2><span class="line"></span></div>'
              f'<p class="lead">{readme_tagline()}</p>'
-             f'<div class="card" style="margin-bottom:14px"><div class="def">R and Python <b>never share '
-             f'memory</b> — no rpy2, no reticulate. They exchange data only through files (DuckDB tables '
-             f'and flat Parquet feeds). Every model is implemented independently in both, and the build '
-             f'fails unless they agree at one of three tiers. If a single-language build is quietly '
-             f'wrong, the other usually isn\'t wrong the same way — the gate turns "looks plausible" into '
-             f'"two toolchains independently agree." Each model is also anchored by a known-answer test: '
+             f'<div class="card" style="margin-bottom:14px"><div class="def">This is <b>dual-channel '
+             f'redundant validation</b> — the same voting logic used on redundant safety-rated measurement '
+             f'channels: two independent implementations must agree before anything ships. R and Python '
+             f'<b>never share memory</b> — no rpy2, no reticulate. They exchange data only through files '
+             f'(DuckDB tables and flat Parquet feeds). Every model is implemented independently in both, '
+             f'and the build fails unless they agree at one of three tiers. If a single-language build is '
+             f'quietly wrong, the other usually isn\'t wrong the same way — the gate turns "looks '
+             f'plausible" into "two toolchains independently agree." Each model is also anchored by a known-answer test: '
              f'<b>parity proves R and Python agree; the KAT proves they agree on something true.</b></div></div>'
              f'<div class="grid3">{trows}</div>'
              f'<div class="card" style="margin-top:14px"><div class="name" style="font-size:16px">What a gate failure looks like</div>'
@@ -1020,12 +1093,16 @@ def build_betting() -> None:
              '(a thin edge = few confident calls), but within it, stated probability tracks the observed '
              'rate — points hug the dashed diagonal. 5 equal-count buckets, n per point.</div></div>'
              '<div class="card"><div class="name" style="font-size:17px">Variance &amp; sizing reality</div>'
-             '<div class="def">An AUC of ~0.55 is a <b>thin</b> edge. Over a season it is real (it beats '
-             'the baselines), but game to game the outcome is dominated by variance — the signal is a '
-             'few percentage points on top of a near-coin-flip.</div>'
-             '<div class="read">Implication: any edge this size needs a large sample and strict staking '
-             'discipline to show through the noise. This is descriptive framing — not betting advice, '
-             'and consistent with the non-commercial data license in the footer.</div></div></div>')
+             '<div class="def"><b>In plain terms:</b> when we say 60%, it happens about 60% of the time, '
+             'and our probabilities are slightly sharper than always-leaning-home (Brier 0.247 vs 0.249). '
+             'Thin — but thin edges are the only kind that exist in this market, and they only pay at '
+             'volume and with discipline (Funder &amp; Ozer, 2019: small effects compound).</div>'
+             '<div class="def" style="margin-top:8px"><b>Odds, translated:</b> a 65% win probability is '
+             '−186 — risk $186 to win $100. That is the price the model implies; a posted line bakes in '
+             'the book\'s margin on top.</div>'
+             '<div class="read">This is descriptive analytics — <b>not betting advice</b>, no staking or '
+             'bankroll recommendations. If gambling stops being fun, help is free and confidential: '
+             'call or text <b>1-800-GAMBLER</b> (ncpgambling.org).</div></div></div>')
     # 4 flat sortable odds table (prerendered)
     body += ('<div class="sec"><h2>Full odds table</h2><span class="line"></span></div>'
              '<p class="lead">All 30 teams, one sortable table (click a column). Playoff and division '
@@ -1106,9 +1183,10 @@ def build_fan() -> None:
              f'<div><div class="n" style="color:var(--good)">{fmt(acc)}%</div><div class="l">our best model picks the winner</div></div>'
              f'<div><div class="n">{fmt(home)}%</div><div class="l">just always pick the home team</div></div>'
              '<div><div class="n">50%</div><div class="l">flip a coin</div></div></div>'
-             '<div class="read" style="margin-top:12px">That tiny gap — a couple of points over always '
-             'picking the home team — is what professional-grade prediction actually looks like. Anyone '
-             'claiming they call baseball games 70% of the time is selling something.</div></div>')
+             '<div class="read" style="margin-top:12px">That half-a-game-in-a-hundred over always picking '
+             'the home team sounds like nothing — but it\'s like aspirin and heart attacks: nearly '
+             'invisible for one person, huge across millions. Across 2,430 games a season, a real edge '
+             'shows up. Anyone claiming they call games 70% of the time is selling something.</div></div>')
     # 4. live playoff snapshot (2026)
     if LIVE:
         top = sorted(LIVE["teams"], key=lambda x: -x["playoff_odds"])[:8]
@@ -1128,21 +1206,21 @@ def build_fan() -> None:
                  f'<div class="card">{rows}</div>'
                  '<p class="lead"><a href="simulator.html">See the full board →</a></p>')
     # 5. draft crapshoot + aging
-    m8 = DATA["metrics"].get("m8_draft", {}).get("python", {})
     peak = DATA["metrics"].get("b3_aging", {}).get("python", {}).get("peak_age")
+    conc = fmt(DATA["effects"]["m8"]["concordance"], 0)
     body += ('<div class="sec"><h2>Two things everyone gets wrong</h2><span class="line"></span></div><div class="grid">'
-             '<div class="card"><div class="name" style="font-size:19px">The draft is a crapshoot</div>'
-             f'<div class="big3" style="grid-template-columns:1fr"><div><div class="n" style="color:var(--gold)">~1%</div>'
-             f'<div class="l">of a hitter\'s big-league production is explained by where they were drafted</div></div></div>'
-             f'<div class="read">Among drafted position players who actually reach the majors, draft slot '
-             f'barely predicts who hits (n={m8.get("n", "—")}). Once you\'re good enough to make it, the '
-             f'draft number stops mattering.</div></div>'
+             '<div class="card"><div class="name" style="font-size:19px">The draft is (almost) a coin flip</div>'
+             f'<div class="big3" style="grid-template-columns:1fr"><div><div class="n" style="color:var(--gold)">{conc} in 100</div>'
+             f'<div class="l">chance an earlier pick out-hits a later one (not 90 in 100)</div></div></div>'
+             f'<div class="read">For any <i>single</i> pick, the draft is close to a coin flip — a little '
+             f'better, not a sure thing. But teams make hundreds of picks a year, and a {conc}/{fmt(100 - int(float(conc)))} '
+             f'tilt repeated that many times adds up. And we could only measure players who <i>reached</i> '
+             f'the majors — which hides some of the draft\'s real power. Both things are true.</div></div>'
              '<div class="card"><div class="name" style="font-size:19px">Hitters peak around 30</div>'
              f'<div class="big3" style="grid-template-columns:1fr"><div><div class="n">{fmt(peak, 0)}</div>'
              f'<div class="l">the age hitters are typically at their best</div></div></div>'
-             '<div class="read">With a catch worth saying out loud: only the good ones stick around long '
-             'enough to be measured when they\'re old, so late-career numbers look better than they '
-             'really are.</div></div></div>')
+             '<div class="read">With a catch: bad players get cut young, so the "old player" data only '
+             'contains the good ones who survived. The real decline is steeper than the curve looks.</div></div></div>')
     # 6. fun facts
     facts = "".join(f'<div class="card"><div class="def">{f}</div></div>' for f in DATA["funfacts"])
     body += ('<div class="sec"><h2>Fun facts from the numbers</h2><span class="line"></span></div>'

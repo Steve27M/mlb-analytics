@@ -9,13 +9,19 @@ Built to be lifted to AWS free tier (Phase 6).
 
 ### 🔗 Live dashboard: **https://steve27m.github.io/mlb-analytics/**
 
-> **Status:** Phases 0–5 complete. 2.18M pitches across 2023–2025, 27 warehouse tables,
-> 50 dbt data tests, **13/13 models green on the parity gate** (exact / label-invariant /
-> distributional tiers). Phase 6 (AWS ELT lift) is the remaining open work.
+> **Status:** live. 2.18M pitches across 2023–2025 (frozen analysis), 27 warehouse tables,
+> 50 dbt data tests, **13/13 models green on the parity gate**, plus a live 2026 layer refreshed
+> nightly. The AWS lift (old "Phase 6") is **decided — rejected on TCO** at this scale; see
+> [`ARCHITECTURE.md`](ARCHITECTURE.md) ADR-6 (knowing when *not* to deploy infrastructure).
 
-This is a portfolio build. The interesting part is not the numbers — it's the discipline that
-makes them trustworthy: a warehouse that rebuilds byte-for-byte, a sealed holdout that is opened
-exactly once, and a two-language parity gate that catches the bugs a single implementation hides.
+Statcast is **sensor telemetry** — Hawk-Eye optical arrays in 30 venues emitting 2.18M measurement
+events — so this is a measurement-system engineering problem: high-volume telemetry ingestion,
+cross-site normalization (park effects are per-venue sensor calibration), a mid-life instrument
+migration (Trackman → Hawk-Eye, 2020), and late/missing/corrected readings. The interesting part is
+the discipline that makes the numbers trustworthy: a warehouse that rebuilds byte-for-byte, a sealed
+holdout opened exactly once, and a two-language parity gate — **dual-channel redundant validation**,
+the voting logic of redundant safety-rated measurement channels — that catches the bugs a single
+implementation hides.
 
 ---
 
