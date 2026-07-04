@@ -55,3 +55,6 @@ dbt/.user.yml
 .DS_Store
 .idea/
 .vscode/
+
+# local agent operating rules — not published
+CLAUDE.md
