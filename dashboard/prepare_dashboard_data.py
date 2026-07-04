@@ -23,7 +23,10 @@ OUT = REPO / "data" / "dashboard"
 DB = os.getenv("MLB_DUCKDB_PATH", str(REPO / "data" / "warehouse.duckdb"))
 GOLD = os.getenv("MLB_GOLD_DIR", str(REPO / "data" / "gold"))
 RESULTS = REPO / "data" / "results"
-RUN_RESULTS = REPO / "dbt" / "target" / "run_results.json"
+# Prefer the FROZEN snapshot saved by the build stage (target/run_results.json gets overwritten by
+# the live `dbt run`, which has no tests). Fall back to the live target for a standalone build.
+_FROZEN_RR = REPO / "data" / "results" / "frozen_run_results.json"
+RUN_RESULTS = _FROZEN_RR if _FROZEN_RR.exists() else REPO / "dbt" / "target" / "run_results.json"
 SIM_SEED = 777  # season_sim.py fixed seed, surfaced in the provenance strip
 
 

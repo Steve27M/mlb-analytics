@@ -21,6 +21,8 @@ REPO = Path(__file__).resolve().parent.parent
 DATA = json.loads((REPO / "data" / "dashboard" / "site_data.json").read_text())
 _SIM_PATH = REPO / "data" / "dashboard" / "season_sim.json"
 SIM = json.loads(_SIM_PATH.read_text()) if _SIM_PATH.exists() else None
+_LIVE_PATH = REPO / "data" / "dashboard" / "live_sim.json"
+LIVE = json.loads(_LIVE_PATH.read_text()) if _LIVE_PATH.exists() else None
 DOCS = REPO / "docs"
 ASSETS = DOCS / "assets"
 GH = "https://github.com/Steve27M/mlb-analytics"
@@ -598,81 +600,90 @@ def build_compare() -> None:
 PAGES["compare.html"] = build_compare
 
 
-def _sim_srow_py(t: dict) -> str:
+def _live_srow_py(t: dict) -> str:
     col = team_fill(t["team_id"])
-    dot = ('<span class="pdot" title="Made the 2025 playoffs"></span>' if t["made_playoffs_actual"]
-           else '<span class="pdot off" title="Missed the 2025 playoffs"></span>')
     return (f'<div class="srow" style="border-left-color:{col}">'
-            f'<div class="steam">{dot}{mono_py(t["team_id"])}<b>{t["abbr"]}</b>'
-            f'<span class="srec">{fmt(t["actual_w"])}-{fmt(t["actual_l"])}</span></div>'
+            f'<div class="steam">{mono_py(t["team_id"])}<b>{t["abbr"]}</b>'
+            f'<span class="srec">{fmt(t["cur_w"])}-{fmt(t["cur_l"])}</span></div>'
             f'<div class="sproj">{fmt(t["proj_wins"], 1)}<span class="srange">{fmt(t["p10"], 1)}–{fmt(t["p90"], 1)}</span></div>'
             f'<div class="obar"><div class="ofill" style="width:{t["playoff_odds"]*100:.0f}%;background:{col}"></div>'
             f'<span class="oval" data-p="{t["playoff_odds"]}">{fmt(t["playoff_odds"]*100, 1)}%</span></div></div>')
 
 
 def build_simulator() -> None:
-    body = head("DIAMONDIQ — Season Simulator",
-                "Monte-Carlo playoff odds: 10,000 simulated 2025 seasons from the game model's "
-                "leakage-safe per-game win probabilities over the real schedule.", "simulator")
-    if not SIM:
-        body += '<div class="hero"><h1>Season Simulator</h1><p>Run season_sim.py first.</p></div>'
+    body = head("DIAMONDIQ — Live 2026 Playoff Odds",
+                "Live playoff odds for the in-progress 2026 season: current standings plus 10,000 "
+                "Monte-Carlo simulations of the remaining schedule with the frozen game model.",
+                "simulator")
+    if not LIVE:
+        body += ('<div class="hero"><h1>Live 2026 Playoff Odds</h1><p>Run the live build + live_sim.py '
+                 'first (the 2026 season data is not yet available).</p></div>')
         _write("simulator.html", body)
         return
-    body += (f'<div class="hero"><div class="eyebrow">Monte Carlo</div><h1>Season Simulator</h1>'
-             f'<p>Ten thousand simulated 2025 seasons. Every one of the {SIM["n_games"]:,} games is a '
-             f'weighted coin-flip using the game model\'s leakage-safe win probability, and we tally '
-             f'wins, division titles, and playoff berths.</p></div>' + prov())
+    played = LIVE["games_played"]
+    total = played + LIVE["n_remaining"]
+    leader = LIVE["teams"][0]
+    body += (f'<div class="hero"><div class="eyebrow">Live · {LIVE["season"]}</div>'
+             f'<h1>2026 Playoff Odds</h1>'
+             f'<p>The in-progress {LIVE["season"]} season, projected forward. We take the current '
+             f'standings and run <b>10,000</b> Monte-Carlo simulations of the {LIVE["n_remaining"]:,} '
+             f'remaining games — each predicted by the <b>frozen</b> game model (trained on 2023–24, '
+             f'validated on the sealed 2025 season) from every team\'s current form.</p></div>')
+    body += (f'<div class="prov">Live {LIVE["season"]} · {played:,} of {total:,} games played '
+             f'· frozen game model · seed {LIVE["seed"]} · aggregate projection, not game picks</div>')
     body += (f'<div class="grid3">'
-             f'<div class="card"><div class="kv"><span>Projected vs. actual wins</span></div>'
-             f'<div class="stat">{fmt(SIM["corr_proj_actual"])}<span class="u">r</span></div>'
-             f'<div class="read">Rank-order recovery of the real standings from forecast alone.</div></div>'
-             f'<div class="card"><div class="kv"><span>Playoff field identified</span></div>'
-             f'<div class="stat">{SIM["top12_playoff_hits"]}<span class="u">/ 12</span></div>'
-             f'<div class="read">Of the 12 highest-odds teams, how many actually reached October.</div></div>'
-             f'<div class="card"><div class="kv"><span>Seasons simulated</span></div>'
-             f'<div class="stat">{SIM["n_sim"] // 1000}<span class="u">K</span></div>'
-             f'<div class="read">Fixed seed so the page is reproducible.</div></div></div>')
-    body += (f'<div class="card callout" style="margin-top:16px"><div class="read"><b>Read it honestly:</b> '
-             f'projected win totals compress toward .500 because the game model is deliberately '
-             f'conservative — MLB games really are near coin-flips (AUC ~0.55). So even a weak team '
-             f'keeps some playoff hope and the best teams don\'t run away. The <b>ordering</b>, though, '
-             f'tracks reality closely (r = {fmt(SIM["corr_proj_actual"])}). That gap between "confident '
-             f'spread" and "correct ranking" is the point.</div></div>')
+             f'<div class="card"><div class="kv"><span>Season progress</span></div>'
+             f'<div class="stat">{played * 100 // total}<span class="u">% played</span></div>'
+             f'<div class="read">{LIVE["n_remaining"]:,} games left to simulate.</div></div>'
+             f'<div class="card"><div class="kv"><span>Best playoff odds</span></div>'
+             f'<div class="stat">{chip_leader(leader)}</div>'
+             f'<div class="read">{leader["cur_w"]}-{leader["cur_l"]}, projected {fmt(leader["proj_wins"], 0)} wins.</div></div>'
+             f'<div class="card"><div class="kv"><span>Simulations</span></div>'
+             f'<div class="stat">{LIVE["n_sim"] // 1000}<span class="u">K</span></div>'
+             f'<div class="read">Fixed seed → reproducible.</div></div></div>')
+    body += ('<div class="card callout" style="margin-top:16px"><div class="read"><b>Read it honestly:</b> '
+             'this is an <b>aggregate season projection</b> — how often each team reaches the playoffs '
+             'across thousands of simulated rest-of-seasons — not a pick for any single game. Remaining '
+             'games use each team\'s current rolling form held constant, so the odds lean on where teams '
+             'stand today; a hot or cold streak will move them. The frozen model is a thin edge '
+             '(AUC ~0.55), so standings drive most of the signal. See '
+             '<a href="data-science.html#game">the model\'s sealed-2025 validation</a>.</div></div>')
     body += ('<div class="toolbar"><button id="viewbtn" class="hamb" style="display:block">Show flat table</button>'
              '<button id="oddsbtn" class="hamb" style="display:block">Show American odds</button>'
-             '<div class="legend"><span><span class="pdot"></span>Made 2025 playoffs</span>'
-             '<span><span class="pdot off"></span>Missed</span>'
-             '<span>Bar = playoff odds · row color = team</span></div></div>')
-    # prerendered division cards (default, no-JS)
+             '<div class="legend"><span>Bar = playoff odds · row color = team · record = current</span></div></div>')
     divs = ""
     for lg, lgname in (("AL", "American League"), ("NL", "National League")):
         divs += f'<div class="sec"><h2>{lgname}</h2><span class="line"></span></div><div class="grid3">'
         for dv in ("East", "Central", "West"):
-            ts = sorted((t for t in SIM["teams"] if t["league"] == lg and t["division"] == dv),
+            ts = sorted((t for t in LIVE["teams"] if t["league"] == lg and t["division"] == dv),
                         key=lambda x: -x["playoff_odds"])
-            rows = "".join(_sim_srow_py(t) for t in ts)
+            rows = "".join(_live_srow_py(t) for t in ts)
             divs += (f'<div class="card"><div class="name" style="font-size:18px;color:var(--a)">{lg} {dv}</div>'
-                     f'<div class="shdr"><span>Team</span><span>Proj W (80% range)</span><span>Playoff odds</span></div>{rows}</div>')
+                     f'<div class="shdr"><span>Team (current)</span><span>Proj W (80% range)</span><span>Playoff odds</span></div>{rows}</div>')
         divs += '</div>'
     body += f'<div id="divview">{divs}</div><div id="tblview" style="display:none;margin-top:16px"></div>'
-    js = ("""<script>const SIM=""" + json.dumps(SIM) + """;
+    js = ("""<script>const SIM=""" + json.dumps(LIVE) + """;
 (function(){let tbl=false,amer=false;
  const divview=document.getElementById('divview'),tblview=document.getElementById('tblview');
  const vb=document.getElementById('viewbtn'),ob=document.getElementById('oddsbtn');
  function oddsTxt(p){return amer?toAmerican(p):fmt(p*100,1)+'%';}
  function refreshOvals(){document.querySelectorAll('#divview .oval').forEach(o=>o.textContent=oddsTxt(+o.dataset.p));}
- function buildTable(){const cols=[['abbr','Team',0],['proj_wins','Proj W',1],['range','80% range',0],['playoff_odds','Playoff',0],['div_odds','Division',0],['actual_w','Actual W',0]];
+ function buildTable(){const cols=[['abbr','Team',0],['cur_w','Current W',0],['proj_wins','Proj W',1],['range','80% range',0],['playoff_odds','Playoff',0],['div_odds','Division',0]];
    let h='<div class="tblwrap"><table class="flat"><thead><tr>';
-   cols.forEach((c,i)=>h+=`<th${i===2?' data-nosort':''}>${c[1]}</th>`);h+='</tr></thead><tbody>';
-   SIM.teams.forEach(t=>{h+=`<tr><td data-v="${t.abbr}">${monogram(t.team_id)} ${t.abbr}${t.made_playoffs_actual?' <span class="pdot" title="made playoffs"></span>':''}</td>`
+   cols.forEach((c,i)=>h+=`<th${i===3?' data-nosort':''}>${c[1]}</th>`);h+='</tr></thead><tbody>';
+   SIM.teams.forEach(t=>{h+=`<tr><td data-v="${t.abbr}">${monogram(t.team_id)} ${t.abbr}</td>`
+     +`<td data-v="${t.cur_w}">${t.cur_w}-${t.cur_l}</td>`
      +`<td data-v="${t.proj_wins}">${fmt(t.proj_wins,1)}</td><td>${fmt(t.p10,1)}–${fmt(t.p90,1)}</td>`
-     +`<td data-v="${t.playoff_odds}">${oddsTxt(t.playoff_odds)}</td><td data-v="${t.div_odds}">${oddsTxt(t.div_odds)}</td>`
-     +`<td data-v="${t.actual_w}">${t.actual_w}-${t.actual_l}</td></tr>`;});
+     +`<td data-v="${t.playoff_odds}">${oddsTxt(t.playoff_odds)}</td><td data-v="${t.div_odds}">${oddsTxt(t.div_odds)}</td></tr>`;});
    h+='</tbody></table></div>';tblview.innerHTML=h;makeSortable(tblview.querySelector('table'));}
  vb.addEventListener('click',()=>{tbl=!tbl;if(tbl)buildTable();tblview.style.display=tbl?'block':'none';divview.style.display=tbl?'none':'block';vb.textContent=tbl?'Show division cards':'Show flat table';});
  ob.addEventListener('click',()=>{amer=!amer;refreshOvals();if(tbl)buildTable();ob.textContent=amer?'Show percent odds':'Show American odds';});})();
 </script>""")
     _write("simulator.html", body, js)
+
+
+def chip_leader(t: dict) -> str:
+    return f'{t["abbr"]} <span class="u">{fmt(t["playoff_odds"] * 100, 0)}%</span>'
 
 
 PAGES["simulator.html"] = build_simulator
@@ -1019,20 +1030,20 @@ def build_betting() -> None:
     body += ('<div class="sec"><h2>Full odds table</h2><span class="line"></span></div>'
              '<p class="lead">All 30 teams, one sortable table (click a column). Playoff and division '
              'odds shown as probability and American price.</p>')
-    if SIM:
-        cols = ["Team", "Proj W", "80% range", "Playoff %", "Playoff", "Div %", "Div", "Actual"]
+    if LIVE:
+        cols = ["Team", "Current", "Proj W", "80% range", "Playoff %", "Playoff", "Div %", "Div"]
         head_cells = "".join(
             f'<th{" data-nosort" if h == "80% range" else ""}>{h}</th>' for h in cols)
         trs = ""
-        for t in sorted(SIM["teams"], key=lambda x: -x["playoff_odds"]):
+        for t in sorted(LIVE["teams"], key=lambda x: -x["playoff_odds"]):
             trs += (f'<tr><td data-v="{t["abbr"]}">{mono_py(t["team_id"])} {t["abbr"]}</td>'
+                    f'<td data-v="{t["cur_w"]}">{t["cur_w"]}-{t["cur_l"]}</td>'
                     f'<td data-v="{t["proj_wins"]}">{fmt(t["proj_wins"], 1)}</td>'
                     f'<td>{fmt(t["p10"], 1)}–{fmt(t["p90"], 1)}</td>'
                     f'<td data-v="{t["playoff_odds"]}">{fmt(t["playoff_odds"] * 100, 1)}%</td>'
                     f'<td data-v="{t["playoff_odds"]}" class="mono">{to_american(t["playoff_odds"])}</td>'
                     f'<td data-v="{t["div_odds"]}">{fmt(t["div_odds"] * 100, 1)}%</td>'
-                    f'<td data-v="{t["div_odds"]}" class="mono">{to_american(t["div_odds"])}</td>'
-                    f'<td data-v="{t["actual_w"]}">{t["actual_w"]}-{t["actual_l"]}</td></tr>')
+                    f'<td data-v="{t["div_odds"]}" class="mono">{to_american(t["div_odds"])}</td></tr>')
         body += f'<div class="tblwrap"><table class="flat" id="oddstbl"><thead><tr>{head_cells}</tr></thead><tbody>{trs}</tbody></table></div>'
         js = '<script>document.querySelectorAll("table.flat").forEach(makeSortable);</script>'
         _write("betting.html", body, js)
@@ -1098,25 +1109,24 @@ def build_fan() -> None:
              '<div class="read" style="margin-top:12px">That tiny gap — a couple of points over always '
              'picking the home team — is what professional-grade prediction actually looks like. Anyone '
              'claiming they call baseball games 70% of the time is selling something.</div></div>')
-    # 4. playoff snapshot
-    if SIM:
-        top = sorted(SIM["teams"], key=lambda x: -x["playoff_odds"])[:8]
+    # 4. live playoff snapshot (2026)
+    if LIVE:
+        top = sorted(LIVE["teams"], key=lambda x: -x["playoff_odds"])[:8]
         rows = ""
         for t in top:
             col = team_fill(t["team_id"])
-            dot = '<span class="pdot" title="Made the 2025 playoffs"></span>' if t["made_playoffs_actual"] else '<span class="pdot off" title="Missed"></span>'
             rows += (f'<div class="srow" style="border-left-color:{col}">'
-                     f'<div class="steam">{dot}{mono_py(t["team_id"])}<b>{t["abbr"]}</b></div>'
+                     f'<div class="steam">{mono_py(t["team_id"])}<b>{t["abbr"]}</b>'
+                     f'<span class="srec">{t["cur_w"]}-{t["cur_l"]}</span></div>'
                      f'<div class="sproj">{fmt(t["proj_wins"], 1)}<span class="srange">proj wins</span></div>'
                      f'<div class="obar"><div class="ofill" style="width:{t["playoff_odds"] * 100:.0f}%;background:{col}"></div>'
                      f'<span class="oval">{fmt(t["playoff_odds"] * 100, 0)}%</span></div></div>')
-        body += ('<div class="sec"><h2>Playoff odds — top of the board</h2><span class="line"></span></div>'
-                 '<p class="lead">From ten thousand simulated seasons. Gold dot = actually made the '
-                 'playoffs.</p>'
-                 '<div class="legend"><span><span class="pdot"></span>Made playoffs</span>'
-                 '<span><span class="pdot off"></span>Missed</span></div>'
+        body += (f'<div class="sec"><h2>Who makes the playoffs? ({LIVE["season"]})</h2><span class="line"></span></div>'
+                 '<p class="lead">Live odds for the current season — each team\'s current record plus '
+                 'ten thousand simulations of the games left to play. It\'s a season-long projection, '
+                 'not a bet on tonight\'s game.</p>'
                  f'<div class="card">{rows}</div>'
-                 '<p class="lead"><a href="simulator.html">See the full simulator →</a></p>')
+                 '<p class="lead"><a href="simulator.html">See the full board →</a></p>')
     # 5. draft crapshoot + aging
     m8 = DATA["metrics"].get("m8_draft", {}).get("python", {})
     peak = DATA["metrics"].get("b3_aging", {}).get("python", {}).get("peak_age")

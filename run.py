@@ -76,6 +76,12 @@ def parity() -> None:
 
 
 @app.command()
+def live() -> None:
+    """Build the LIVE current-season (2026) warehouse into a separate DuckDB (frozen untouched)."""
+    _stage(stages.live_build)
+
+
+@app.command()
 def dashboard() -> None:
     """Python pre-render (DuckDB -> site_data.json), build the static DIAMONDIQ site into docs/."""
     _stage(stages.dashboard)

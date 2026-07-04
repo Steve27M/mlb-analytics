@@ -98,6 +98,14 @@ def build() -> None:
     run_cmd(dbt("deps"))
     run_cmd(dbt("run", "--select", "staging"))
     run_cmd(dbt("build"))
+    # Snapshot the FROZEN dbt-test results so the dashboard's test tally survives a later live
+    # `dbt run` (which overwrites target/run_results.json with the live, test-free results).
+    import shutil
+    rr = REPO_ROOT / "dbt" / "target" / "run_results.json"
+    if rr.exists():
+        dest = REPO_ROOT / "data" / "results"
+        dest.mkdir(parents=True, exist_ok=True)
+        shutil.copy(rr, dest / "frozen_run_results.json")
 
 
 def export() -> None:
@@ -117,11 +125,22 @@ def parity() -> None:
     run_scripts(["parity/load_results.py"], runner=py)  # parity GATE
 
 
+def live_build() -> None:
+    """Build the LIVE current-season warehouse (2026) into a SEPARATE DuckDB
+    (MLB_LIVE_DUCKDB_PATH) — land all bronze, then dbt-run scoped to the live season via the
+    analysis_seasons override. The frozen 2023-2025 warehouse is never touched."""
+    live_db = os.getenv("MLB_LIVE_DUCKDB_PATH", "data/warehouse_live.duckdb")
+    live_season = os.getenv("MLB_LIVE_SEASON", "2026")
+    env = {"MLB_DUCKDB_PATH": live_db}
+    run_scripts(["ingest/land.py"], runner=["uv", "run", "python"], env=env)
+    run_cmd(dbt("run", "--vars", f"{{analysis_seasons: [{live_season}]}}"), env=env)
+
+
 def dashboard() -> None:
-    """Python pre-render (DuckDB -> JSON) + season sim, then build the static site into docs/."""
+    """Pre-render (DuckDB -> JSON) + season sim + live 2026 sim, then build the static site."""
     run_scripts(
         ["dashboard/prepare_dashboard_data.py", "dashboard/season_sim.py",
-         "dashboard/build_site.py"], runner=["uv", "run", "python"],
+         "dashboard/live_sim.py", "dashboard/build_site.py"], runner=["uv", "run", "python"],
     )
 
 

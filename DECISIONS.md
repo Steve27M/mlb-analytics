@@ -3,6 +3,24 @@
 Non-trivial judgment calls (date, decision, alternatives, rationale), per the operating
 rules in `PROJECT_SPEC.md`. Newest first.
 
+## 2026-07-04 — Live-2026 layer: simulator + betting switch to the current season
+
+- **Separate LIVE warehouse** (`data/warehouse_live.duckdb`, gitignored) built via a new `live`
+  stage: land all bronze, then `dbt run --vars '{analysis_seasons: [2026]}'` -> 2026-only gold. The
+  frozen 2023-2025 warehouse is never touched.
+- **`dashboard/live_sim.py`** — the live counterpart to season_sim: refit the FROZEN game model on
+  2023-24, take the CURRENT 2026 standings, and Monte-Carlo the ~1,114 REMAINING scheduled games
+  (each predicted from teams' current rolling form) into playoff odds. Sane output (LAD 58-31 ~100%,
+  cellar teams ~0%). Deterministic (fixed seed + `order by game_pk` on the remaining schedule —
+  same row-order fix as season_sim/B4). Skips gracefully if the live warehouse is absent.
+- **Simulator, betting table, and fan playoff snapshot now show LIVE 2026** (current record + proj
+  wins + playoff odds); the sealed-2025 evaluation stays frozen on data-science (game model card).
+  Framing kept compliant: aggregate season projection, no live game picks.
+- **Fixed a recurring fragility:** the dashboard's dbt-test count read `target/run_results.json`,
+  which the live `dbt run` (test-free) overwrites -> showed 0. The `build` stage now snapshots the
+  frozen test results to `data/results/frozen_run_results.json`, which prepare prefers.
+- `run.py live` builds the live warehouse; `dashboard` now also runs `live_sim.py`.
+
 ## 2026-07-04 — Live-2026 foundation: frozen/live season split (design A)
 
 Ingested the current 2026 season; keeping the validated retrospective analysis FROZEN on complete
