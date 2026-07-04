@@ -71,3 +71,19 @@ jobs:
             git commit -m "nightly: 2026 refresh $(date -u +%F)"
             git push
           fi
+
+      # $0 pager: a silent cron death is the standard hobby-pipeline failure mode. File/append a
+      # GitHub Issue so a red night is impossible to miss (deduped onto one open incident thread).
+      - name: File a GitHub Issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          body=$(printf 'The nightly 2026 refresh failed on %s.\n\nRun log: %s\n\nCheck the failing stage; the DLQ drains next run, but a stage-level failure (land/build/parity) blocks publish by design.' "$(date -u +%F)" "$run_url")
+          existing=$(gh issue list --search "nightly refresh failing in:title state:open" --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "nightly refresh failing" --body "$body"
+          fi

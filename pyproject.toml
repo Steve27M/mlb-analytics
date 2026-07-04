@@ -52,7 +52,7 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["_common", "pipeline"]
+known-first-party = ["_common", "_dlq", "pipeline"]
 
 [tool.mypy]
 python_version = "3.11"

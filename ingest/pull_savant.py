@@ -27,6 +27,7 @@ from datetime import date, timedelta
 import pybaseball as pb
 
 from _common import log, partition_exists, read_manifest, seasons, write_partition
+from _dlq import drain, enqueue, prior_attempts, stats
 
 SOURCE = "statcast"
 ID_COLS = ["game_pk", "batter", "pitcher", "at_bat_number", "pitch_number"]
@@ -100,15 +101,24 @@ def main() -> None:
         days = [d for y in seasons() for d in _season_days(y)]
         log("ingest", SOURCE, event="full_run", seasons=seasons(), days=len(days))
 
+    # Drain the DLQ first: quarantine anything that has failed MAX_ATTEMPTS times (stop retrying);
+    # skip quarantined days. Retryable failures are simply re-attempted by the loop below.
+    quarantined = drain()
+    attempts = prior_attempts()
     failures = []
     for day in days:
+        if (SOURCE, day) in quarantined:
+            log("ingest", SOURCE, event="quarantined_skip", game_date=day)
+            continue
         try:
             pull_day(day, force)
-        except Exception as e:  # one bad day must not abort a multi-season chain
+        except Exception as e:  # one bad day must not abort a multi-season chain -> DLQ it
+            att = attempts.get((SOURCE, day), 0) + 1
+            enqueue(SOURCE, day, "baseballsavant/statcast", e, att)
             failures.append(day)
-            log("ingest", SOURCE, event="error", game_date=day, error=str(e))
+            log("ingest", SOURCE, event="error", game_date=day, error=str(e), attempt=att)
     log("ingest", SOURCE, event="run_done", days=len(days), failures=len(failures),
-        failed_days=failures[:20])
+        failed_days=failures[:20], dlq=stats())
 
 
 if __name__ == "__main__":
