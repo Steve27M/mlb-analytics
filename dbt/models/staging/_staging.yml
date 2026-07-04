@@ -19,9 +19,11 @@ models:
       - name: game_pk
         tests: [not_null, unique]
       - name: season
+        # Range, not a fixed list: the pipeline grows into the live current season (2026+).
+        # The frozen analysis (2023-2025, sealed 2025 holdout) is pinned in the model code, not here.
         tests:
-          - accepted_values:
-              values: [2023, 2024, 2025]
+          - dbt_utils.accepted_range:
+              min_value: 2023
       - name: game_type
         tests:
           - accepted_values:
