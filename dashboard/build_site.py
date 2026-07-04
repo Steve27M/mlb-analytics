@@ -25,6 +25,16 @@ _LIVE_PATH = REPO / "data" / "dashboard" / "live_sim.json"
 LIVE = json.loads(_LIVE_PATH.read_text()) if _LIVE_PATH.exists() else None
 _LMODEL_PATH = REPO / "data" / "dashboard" / "live_model.json"
 LIVE_MODEL = json.loads(_LMODEL_PATH.read_text()) if _LMODEL_PATH.exists() else None
+
+
+def _load_ops(name):
+    p = REPO / "docs" / "data" / name
+    return json.loads(p.read_text()) if p.exists() else None
+
+
+RUNS = _load_ops("runs.json") or []
+SPC = _load_ops("spc_limits.json") or {}
+INCIDENTS = _load_ops("incidents.json") or []
 DOCS = REPO / "docs"
 ASSETS = DOCS / "assets"
 GH = "https://github.com/Steve27M/mlb-analytics"
@@ -328,7 +338,8 @@ def teams_js() -> str:
 # ------------------------------------------------------------------ shared chrome
 NAVITEMS = [("fan", "Fans"), ("betting", "Betting"), ("data-eng", "Data Eng"),
             ("data-science", "Data Science"), ("compare", "Compare"),
-            ("simulator", "Simulator"), ("live", "Live"), ("glossary", "Stat Guide")]
+            ("simulator", "Simulator"), ("live", "Live"), ("ops", "Ops"),
+            ("glossary", "Stat Guide")]
 
 
 def nav(active: str) -> str:
@@ -801,6 +812,127 @@ def build_live() -> None:
 
 
 PAGES["live.html"] = build_live
+
+
+# ------------------------------------------------------------------ ops.html (observability + SPC)
+SPC_LABELS = {"rows_ingested": "Rows ingested", "ingest_sec": "Ingest wall-time (s)",
+              "dbt_test_sec": "dbt test time (s)", "fastball_velo": "League fastball velo (mph)",
+              "pitches_per_game": "Pitches per game"}
+
+
+def _spc_svg(series_key: str, runs: list, lim: dict) -> str:
+    """Shewhart individuals chart: points, center line, ±3σ band (UCL/LCL), violations in --bad."""
+    vals = [(i, r[series_key]) for i, r in enumerate(runs) if isinstance(r.get(series_key), (int, float))]
+    if not vals:
+        return ""
+    W, H, pad = 460, 150, 34
+    xs = [v[0] for v in vals]
+    ys = [v[1] for v in vals]
+    ucl, lcl, cl = lim["ucl"], lim["lcl"], lim["cl"]
+    lo = min(min(ys), lcl)
+    hi = max(max(ys), ucl)
+    rng = (hi - lo) or 1
+    xr = (max(xs) - min(xs)) or 1
+
+    def sx(i):
+        return pad + (i - min(xs)) / xr * (W - 2 * pad)
+
+    def sy(y):
+        return H - pad - (y - lo) / rng * (H - 2 * pad)
+    band = (f'<rect x="{pad}" y="{sy(ucl):.0f}" width="{W - 2 * pad}" height="{sy(lcl) - sy(ucl):.0f}" '
+            f'fill="rgba(61,220,132,.06)"/>'
+            f'<line x1="{pad}" y1="{sy(cl):.0f}" x2="{W - pad}" y2="{sy(cl):.0f}" stroke="var(--sub)" stroke-dasharray="3 3"/>'
+            f'<line x1="{pad}" y1="{sy(ucl):.0f}" x2="{W - pad}" y2="{sy(ucl):.0f}" stroke="var(--good)" stroke-width="1"/>'
+            f'<line x1="{pad}" y1="{sy(lcl):.0f}" x2="{W - pad}" y2="{sy(lcl):.0f}" stroke="var(--good)" stroke-width="1"/>'
+            f'<text x="{W - pad}" y="{sy(ucl) - 3:.0f}" fill="var(--sub)" font-size="9" text-anchor="end" font-family="JetBrains Mono">UCL {fmt(ucl)}</text>'
+            f'<text x="{W - pad}" y="{sy(lcl) + 10:.0f}" fill="var(--sub)" font-size="9" text-anchor="end" font-family="JetBrains Mono">LCL {fmt(lcl)}</text>')
+    path = "M" + " L".join(f"{sx(i):.0f} {sy(y):.0f}" for i, y in vals)
+    pts = ""
+    for i, y in vals:
+        out = y > ucl or y < lcl
+        pts += f'<circle cx="{sx(i):.0f}" cy="{sy(y):.0f}" r="3" fill="{"var(--bad)" if out else "var(--a)"}"/>'
+    return (f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Control chart for {SPC_LABELS.get(series_key, series_key)}">'
+            f'{band}<path d="{path}" fill="none" stroke="var(--a)" stroke-width="1.5" opacity=".7"/>{pts}</svg>')
+
+
+def build_ops() -> None:
+    body = head("DIAMONDIQ — Pipeline Ops",
+                "Observability for the nightly pipeline: freshness, run history, statistical process "
+                "control on its own health metrics, the dead-letter queue, and an honest incident log.",
+                "ops", "t-eng")
+    last = RUNS[-1] if RUNS else None
+    body += ('<div class="hero"><div class="eyebrow">Observability</div><h1>pipeline ops</h1>'
+             '<p>The nightly pipeline monitored like a production system — statistical process control '
+             'on its own health, a dead-letter queue, and an incident log with <b>real</b> entries. '
+             'SPC violations <b>warn</b>; they never block (the dbt tests and parity gate are the '
+             'gates).</p></div>')
+    # freshness banner
+    if last:
+        state = "var(--good)"
+        body += (f'<div class="prov" style="border-left-color:{state}">Last run <b>{last["ts"]}</b> · '
+                 f'commit {last["sha"]} · dbt tests {last["dbt_tests_pass"]}/{last["dbt_tests_total"]} · '
+                 f'parity {"green" if last.get("parity_ok") else "RED"} · target 10:00 ET nightly</div>')
+    else:
+        body += '<div class="prov">No runs recorded yet — the nightly writes the first record.</div>'
+    # top stats
+    dlq = last["dlq"] if last else {"depth": 0, "quarantined": 0}
+    mttrs = [i["mttr_hours"] for i in INCIDENTS if isinstance(i.get("mttr_hours"), (int, float))]
+    mttr = round(sum(mttrs) / len(mttrs), 1) if mttrs else "—"
+    body += (f'<div class="grid3">'
+             f'<div class="card"><div class="kv"><span>Runs recorded</span></div><div class="stat">{len(RUNS)}</div>'
+             f'<div class="read">SPC needs ~15 to set control limits.</div></div>'
+             f'<div class="card"><div class="kv"><span>Dead-letter queue</span></div>'
+             f'<div class="stat" style="color:{"var(--bad)" if dlq["depth"] else "var(--good)"}">{dlq["depth"]}'
+             f'<span class="u">queued · {dlq["quarantined"]} quarantined</span></div>'
+             f'<div class="read">Failed pulls retried then quarantined — never a dead night.</div></div>'
+             f'<div class="card"><div class="kv"><span>Mean time to recovery</span></div><div class="stat">{mttr}<span class="u">hrs</span></div>'
+             f'<div class="read">Across {len(INCIDENTS)} logged incidents.</div></div></div>')
+    # run history strip
+    if RUNS:
+        strip = "".join(
+            f'<span title="{r["ts"]}" style="display:inline-block;width:10px;height:22px;border-radius:2px;'
+            f'background:{"var(--good)" if r.get("parity_ok") and r.get("dbt_tests_pass") == r.get("dbt_tests_total") else "var(--bad)"};margin-right:2px"></span>'
+            for r in RUNS[-30:])
+        body += ('<div class="sec"><h2>Run history</h2><span class="line"></span></div>'
+                 f'<div class="card"><div class="read" style="margin:0 0 8px">Last {min(len(RUNS), 30)} runs — '
+                 'green = all gates passed.</div>' + strip + '</div>')
+    # SPC charts
+    body += ('<div class="sec"><h2>Statistical process control</h2><span class="line"></span></div>'
+             '<p class="lead">Individuals control charts on the pipeline\'s own health — limits derived '
+             'from the process (moving-range estimate), not fixed thresholds. The physical canaries '
+             '(fastball velocity, pitches per game) double as <b>data-drift detection</b> on the feed.</p>')
+    viol = SPC.get("violations", {})
+    if SPC.get("series"):
+        body += '<div class="grid">'
+        for key, lim in SPC["series"].items():
+            v = viol.get(key)
+            badge = (f'<span class="badge" style="background:var(--gold);color:#1a1204;border-color:var(--gold)">investigate: {v[0]}</span>'
+                     if v else '<span class="badge good">in control</span>')
+            body += (f'<div class="card"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+                     f'<span class="name" style="font-size:15px">{SPC_LABELS.get(key, key)}</span>{badge}</div>'
+                     f'{_spc_svg(key, RUNS, lim)}</div>')
+        body += '</div>'
+    else:
+        body += (f'<div class="card"><div class="def">{SPC.get("baseline", "Collecting baseline")} — '
+                 'control limits appear once enough nightly runs have accrued. The machinery '
+                 '(Shewhart individuals charts, Western Electric rules, weekly limit recompute) is '
+                 'live; it just needs data.</div></div>')
+    # incident log
+    body += ('<div class="sec"><h2>Incident log</h2><span class="line"></span></div>'
+             '<p class="lead">Real failures and their fixes — not a curated wall of green. These are '
+             'genuine bugs this pipeline hit and how they were resolved.</p><div class="grid">')
+    sevcol = {"high": "var(--bad)", "medium": "var(--gold)", "low": "var(--sub)"}
+    for inc in INCIDENTS:
+        body += (f'<div class="card"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+                 f'<span class="name" style="font-size:15px">{inc["title"]}</span>'
+                 f'<span class="badge" style="color:{sevcol.get(inc["severity"], "var(--sub)")}">{inc["date"]} · {inc["severity"]}</span></div>'
+                 f'<div class="def">{inc["detail"]}</div>'
+                 f'<div class="read"><b>Fix:</b> {inc["fix"]} <span class="mono" style="color:var(--sub)">(MTTR ~{inc["mttr_hours"]}h)</span></div></div>')
+    body += '</div>'
+    _write("ops.html", body)
+
+
+PAGES["ops.html"] = build_ops
 
 
 # ------------------------------------------------------------------ data-science.html

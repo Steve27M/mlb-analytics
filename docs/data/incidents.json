@@ -1,0 +1,11 @@
+[
+  {"date": "2026-07-04", "severity": "high", "title": "pull_people overwrote the frozen roster",
+   "detail": "The people pull fetched only the current-season roster and overwrote the single people partition, dropping players who had retired by 2026. B3's aging curve broke silently (peak 30 -> 51) because their birth years vanished.",
+   "fix": "Made pull_people cumulative (union with the existing partition); birth years are stable so a union never changes a value. B3 restored to exactly 30.0026.", "mttr_hours": 1},
+  {"date": "2026-07-04", "severity": "medium", "title": "Wikipedia 429 aborted the draft pull",
+   "detail": "Twelve draft year-pages fetched back-to-back tripped a Wikipedia rate limit; get_json's exponential backoff exhausted because it ignored the server Retry-After header, and the whole ingest aborted (lost draft years 2018-2019).",
+   "fix": "get_json now honors Retry-After (cap 60s); the draft pull throttles at 2s/page.", "mttr_hours": 1},
+  {"date": "2026-07-04", "severity": "low", "title": "dbt test count read a clobbered run_results",
+   "detail": "The dashboard's test tally read dbt/target/run_results.json, which the live (test-free) dbt run overwrites -> the page showed 0 passing tests.",
+   "fix": "The build stage snapshots the frozen test results to data/results/frozen_run_results.json, which prepare prefers.", "mttr_hours": 1}
+]

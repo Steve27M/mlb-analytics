@@ -88,6 +88,12 @@ def dashboard() -> None:
 
 
 @app.command()
+def ops() -> None:
+    """Record one observability run (SPC limits + DLQ depth + gate status) to docs/data/."""
+    _stage(stages.ops)
+
+
+@app.command()
 def backfill(season: int = typer.Option(..., help="Prior season to pull, e.g. 2022.")) -> None:
     """Bounded historical bronze pull for a single prior season."""
     _stage(stages.ingest, str(season))

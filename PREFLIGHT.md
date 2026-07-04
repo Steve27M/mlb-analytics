@@ -167,11 +167,13 @@ Per FEEDBACK2 §8, a full compliance review run after the Phase-3 changes. Rende
     descriptive UA); 2023-2025 cache-hit, only the 2026 delta fetched. Individual, non-commercial,
     non-bulk. **No raw/row-level redistribution** — bronze/warehouse are gitignored; only aggregates
     + code committed. COMPLIANT (§1-2).
-  - *MLB GUMBO live feed* (`statsapi.mlb.com/api/v1.1/game/{pk}/feed/live`, planned for live.html):
-    SAME MLBAM host and terms as statsapi (§1) — no separate pre-flight needed, but two live-specific
-    guards REQUIRED when live.html ships: client polling throttled to 15-20s, and the client-fan-out
-    rate-limit exposure is documented with a revisit trigger (ARCHITECTURE.md ADR-4). Displays
-    professional on-field data only. NOTE: live.html not yet built — activate these guards on build.
+  - *MLB GUMBO live feed* (`statsapi.mlb.com/api/v1.1/game/{pk}/feed/live`, now live on live.html):
+    SAME MLBAM host and terms as statsapi (§1) — no separate pre-flight needed. Both required live
+    guards are **VERIFIED in the built page (2026-07-04):** client polling throttled to `POLL=18000`
+    (18s, inside the 15-20s band) with backoff to 20s on error / `If-None-Match` conditional GETs, and
+    the client-fan-out rate-limit exposure is documented with a revisit trigger (ARCHITECTURE.md ADR-4,
+    referenced on the page). Win probability is derived client-side from the public feed; displays
+    professional on-field data only; zero raster images. COMPLIANT — forward requirement CLEARED.
   - *The Odds API:* only DERIVED aggregates published (model-vs-market comparison); raw per-book
     moneylines stay private/gitignored; not resold/redistributed as a standalone data product; key
     is a repo secret, never committed. COMPLIANT (§9). Attributed in the footer.
@@ -180,8 +182,9 @@ Per FEEDBACK2 §8, a full compliance review run after the Phase-3 changes. Rende
   Wordmarks (team names) used referentially. Footer disclaimer on all 8 content pages. COMPLIANT.
 - **Gambling-adjacent content.** betting.html is DESCRIPTIVE analytics only — no staking, sizing, or
   bankroll advice; no jurisdiction-specific claims. A responsible-gambling line (1-800-GAMBLER,
-  ncpgambling.org) is present. When live.html ships it must carry the same disclaimer + responsible-
-  gambling line. COMPLIANT (with the live.html follow-through noted).
+  ncpgambling.org) is present. live.html now carries the same guard **(VERIFIED):** its win-probability
+  card reads "Descriptive analytics, not a betting pick" and surfaces 1-800-GAMBLER. COMPLIANT —
+  live.html follow-through CLEARED.
 - **Citation integrity.** Funder & Ozer (2019) cited with the full reference on data-science.html and
   short-cited on betting.html, with a working DOI. Their argument is represented FAITHFULLY, including
   where it pushes AGAINST this project's original framing — the M8 write-up was rewritten to drop the
@@ -190,12 +193,23 @@ Per FEEDBACK2 §8, a full compliance review run after the Phase-3 changes. Rende
 - **Privacy.** Draft dataset is public-record professional data (Wikipedia, CC BY-SA); 247Sports /
   Rivals were rejected earlier over ToS + minor-PII. No minor-PII entered via any Phase-3 source; the
   live feed shows professional on-field data only. COMPLIANT.
-- **Ops honesty (applies when the observability layer ships).** ops.html / SPC / the incident log are
-  NOT yet built. When they are: the incident log must contain REAL entries (not curated green), and
-  SPC physical canaries (e.g. league mean fastball velocity) must expose only published aggregates —
-  no row-level data. Flagged as a build-time requirement.
+- **Ops honesty (observability layer now shipped).** ops.html / SPC / the incident log are built and
+  **VERIFIED (2026-07-04):**
+  - *Incident log is REAL, not curated green* — the three entries (`docs/data/incidents.json`) are
+    genuine bugs this build hit and fixed: pull_people overwriting the frozen roster (B3 aging broke),
+    the Wikipedia 429 that aborted the draft pull, and the clobbered `run_results.json` test tally. No
+    invented "all green" incidents.
+  - *SPC canaries are aggregate-only* — the recorded series are league-mean fastball velocity, pitches
+    per game, whole-warehouse row count, and pipeline wall-times (`docs/data/runs.json`). All are
+    process/aggregate metrics; **no row-level or per-player data** is written to the committed ops JSON.
+  - *SPC warns, never blocks* — control-chart violations render amber; the dbt tests + parity gate
+    remain the only blocking gates. Honest "collecting baseline (1/15 runs)" shown until limits accrue.
+    The DLQ surfaces depth/quarantine/MTTR truthfully (0/0 at first run). COMPLIANT — forward
+    requirement CLEARED.
 
-**Verdict:** COMPLIANT as of 2026-07-04. Two forward requirements when the unbuilt pieces ship:
-(1) live.html — polling throttle + client fan-out guard + gambling disclaimer/responsible-gambling
-line; (2) ops.html — honest (non-curated) incident log + aggregate-only SPC canaries. Re-review at
-that point.
+**Verdict:** COMPLIANT as of 2026-07-04. Both forward requirements from the prior review are now
+CLEARED against the built pages: (1) live.html — polling throttled to 18s + client fan-out guard
+documented (ADR-4) + "not a betting pick"/1-800-GAMBLER; (2) ops.html — honest (non-curated) incident
+log + aggregate-only SPC canaries + non-blocking SPC. No open compliance items across the Phase-3
+scope (live win-prob, ops/SPC, DLQ, effect-size honesty, The Odds API, IP, privacy). Re-review on any
+new data source or before any commercial use.

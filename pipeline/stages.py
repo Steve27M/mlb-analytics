@@ -136,11 +136,20 @@ def live_build() -> None:
     run_cmd(dbt("run", "--vars", f"{{analysis_seasons: [{live_season}]}}"), env=env)
 
 
+def ops() -> None:
+    """Record one observability run (SPC control limits + DLQ depth + gate status) to
+    docs/data/. Never raises on a control-chart violation — SPC WARNS, the dbt tests and parity
+    gate are the gates. Run after `build`/`parity` so it reads fresh gate results."""
+    run_scripts(["dashboard/ops.py"], runner=["uv", "run", "python"])
+
+
 def dashboard() -> None:
-    """Pre-render (DuckDB -> JSON) + season sim + live 2026 sim, then build the static site."""
+    """Pre-render (DuckDB -> JSON) + season sim + live 2026 sim, record an ops run, then build the
+    static site (so ops.html reflects the run just recorded)."""
     run_scripts(
         ["dashboard/prepare_dashboard_data.py", "dashboard/season_sim.py",
-         "dashboard/live_sim.py", "dashboard/build_site.py"], runner=["uv", "run", "python"],
+         "dashboard/live_sim.py", "dashboard/ops.py", "dashboard/build_site.py"],
+        runner=["uv", "run", "python"],
     )
 
 
