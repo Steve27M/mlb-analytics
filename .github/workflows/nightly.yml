@@ -53,6 +53,7 @@ jobs:
           uv run python run.py ingest        # statsapi/Savant delta + daily closing-line snapshot
           uv run python run.py land          # bronze -> frozen warehouse
           uv run python run.py build         # frozen 2023-25 gold (+ 50 tests, frozen_run snapshot)
+          uv run python run.py export        # frozen model feeds -> data/gold/*.parquet (sims read these)
           uv run python run.py determinism   # same-input determinism gate (build twice, compare)
           uv run python run.py live          # 2026-only live warehouse (separate DuckDB)
           uv run python run.py dashboard     # prepare + season_sim + live_sim + build_site
