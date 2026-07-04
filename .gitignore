@@ -63,3 +63,8 @@ CLAUDE.md
 *odds*.txt
 *.env*.txt
 *ODDS*
+
+# --- dagster local run artifacts ---
+.dagster_home/
+.tmp_dagster_home_*/
+logs/
