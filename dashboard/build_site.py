@@ -114,7 +114,9 @@ def fmt(v, dec: int = 3) -> str:
         return "—"
     if isinstance(v, int) or (isinstance(v, float) and v.is_integer()):
         return str(int(v))
-    return f"{round(float(v), min(dec, 3)):.{min(dec, 3)}f}".rstrip("0").rstrip(".")
+    s = f"{round(float(v), min(dec, 3)):.{min(dec, 3)}f}"
+    # strip trailing zeros only past a decimal point — else "30" (dec=0) would become "3"
+    return s.rstrip("0").rstrip(".") if "." in s else s
 
 
 def to_american(p: float) -> str:
