@@ -274,7 +274,7 @@ table.flat td{padding:8px 12px;text-align:right;border-bottom:1px solid rgba(255
 /* ---- pipeline / svg diagram ---- */
 .diagram{overflow-x:auto;border:1px solid var(--border);border-radius:14px;background:var(--panel2);padding:14px;} .diagram svg{display:block;min-width:720px;}
 /* ---- doors (index) ---- */
-.doors{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:8px;} .door{border-radius:16px;border:1px solid var(--border);background:var(--panel);padding:22px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s,transform .15s;} .door:hover{border-color:var(--a);transform:translateY(-2px);} .door .t{font:400 26px 'Anton';text-transform:uppercase;} .door .d{font:400 13px/1.55 'Space Grotesk';color:var(--sub);} .door .go{margin-top:auto;font:700 12px 'Space Grotesk';color:var(--a);letter-spacing:.04em;text-transform:uppercase;}
+.doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:8px;} .door{border-radius:16px;border:1px solid var(--border);background:var(--panel);padding:22px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s,transform .15s;} .door:hover{border-color:var(--a);transform:translateY(-2px);} .door .t{font:400 26px 'Anton';text-transform:uppercase;} .door .d{font:400 13px/1.55 'Space Grotesk';color:var(--sub);} .door .go{margin-top:auto;font:700 12px 'Space Grotesk';color:var(--a);letter-spacing:.04em;text-transform:uppercase;}
 .big3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center;} .big3 .n{font:700 40px 'Saira Condensed';line-height:1;} .big3 .l{font:500 12px 'Space Grotesk';color:var(--sub);margin-top:4px;}
 .callout{border:1px solid var(--gold);border-radius:14px;background:color-mix(in srgb,var(--gold) 6%,var(--panel));padding:16px 18px;} .callout .read{border-color:var(--gold);}
 footer{margin-top:44px;font:500 12px/1.7 'Space Grotesk';color:var(--sub);} footer a{color:var(--a);}
@@ -1023,6 +1023,117 @@ def _calibration_svg() -> str:
             f'</svg></div>')
 
 
+def _stability_bar_svg() -> str:
+    """Year-over-year self-correlation (r) for four hitting stats as a horizontal bar chart —
+    the skill-vs-luck spectrum, straight from DATA['stability'] (no fabricated points)."""
+    st = DATA["stability"]
+    rows = [("K%", "k_pct"), ("BB%", "bb_pct"), ("OPS", "ops"), ("BABIP", "babip")]
+    rows = [(lab, k) for lab, k in rows if k in st]
+    W, H, padL, padR, padT, padB = 460, 232, 88, 44, 16, 44
+    plotW = W - padL - padR
+    rowH = (H - padT - padB) / len(rows)
+    bh = rowH * 0.5
+
+    def sx(r):
+        return padL + r * plotW
+    svg = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Year-over-year self-correlation r '
+           f'for K%, BB%, OPS and BABIP — higher means more repeatable skill">']
+    for gv in (0, .2, .4, .6, .8, 1.0):
+        x = sx(gv)
+        svg.append(f'<line x1="{x:.0f}" y1="{padT}" x2="{x:.0f}" y2="{H - padB}" stroke="rgba(255,255,255,.06)"/>'
+                   f'<text x="{x:.0f}" y="{H - padB + 15:.0f}" fill="var(--sub)" font-size="10" '
+                   f'font-family="JetBrains Mono" text-anchor="middle">{gv:.1f}</text>')
+    for i, (lab, key) in enumerate(rows):
+        r = st[key]["r"]
+        y = padT + i * rowH + (rowH - bh) / 2
+        col = "var(--good)" if r >= .6 else "var(--bad)" if r < .4 else "var(--gold)"
+        svg.append(f'<rect x="{padL}" y="{y:.0f}" width="{max(sx(r) - padL, 1):.0f}" height="{bh:.0f}" '
+                   f'rx="4" fill="color-mix(in srgb,{col} 28%,transparent)" stroke="{col}" stroke-width="1.5"/>'
+                   f'<text x="{padL - 8}" y="{y + bh / 2 + 4:.0f}" fill="var(--text)" font-size="13" '
+                   f'font-family="Space Grotesk" text-anchor="end">{lab}</text>'
+                   f'<text x="{sx(r) + 6:.0f}" y="{y + bh / 2 + 4:.0f}" fill="{col}" font-size="12" '
+                   f'font-family="JetBrains Mono">{r:.2f}</text>')
+    svg.append(f'<text x="{padL + plotW / 2:.0f}" y="{H - 6}" fill="var(--sub)" font-size="11" '
+               f'font-family="Space Grotesk" text-anchor="middle">year-to-year self-correlation r  '
+               f'(luck → 0 · skill → 1)</text></svg>')
+    return f'<div class="calib">{"".join(svg)}</div>'
+
+
+def _aging_curve_svg() -> str:
+    """The fitted B3 quadratic (OPS vs age) drawn on a fixed, baseball-meaningful y-axis so the
+    shallow real effect is not visually exaggerated. Curve is the actual fitted coefficients."""
+    m = DATA["metrics"].get("b3_aging", {}).get("python", {})
+    co = m.get("coef", {})
+    if not co:
+        return ""
+    b0, b1, b2 = co.get("intercept", 0), co.get("age", 0), co.get("age_sq", 0)
+    peak = m.get("peak_age", 30)
+    ax_lo, ax_hi = 20, 40           # age domain
+    y_lo, y_hi = 0.600, 0.800       # fixed OPS domain — honest scale, effect stays shallow
+    W, H, pad = 460, 300, 46
+
+    def sx(a):
+        return pad + (a - ax_lo) / (ax_hi - ax_lo) * (W - 2 * pad)
+
+    def sy(v):
+        return H - pad - (v - y_lo) / (y_hi - y_lo) * (H - 2 * pad)
+    svg = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Fitted OPS-versus-age curve, '
+           f'peaking near age {peak:.0f}; the aging effect is real but shallow">']
+    for a in range(ax_lo, ax_hi + 1, 4):
+        svg.append(f'<line x1="{sx(a):.0f}" y1="{pad}" x2="{sx(a):.0f}" y2="{H - pad}" stroke="rgba(255,255,255,.06)"/>'
+                   f'<text x="{sx(a):.0f}" y="{H - pad + 16:.0f}" fill="var(--sub)" font-size="10" '
+                   f'font-family="JetBrains Mono" text-anchor="middle">{a}</text>')
+    for v in (0.600, 0.650, 0.700, 0.750, 0.800):
+        svg.append(f'<line x1="{pad}" y1="{sy(v):.0f}" x2="{W - pad}" y2="{sy(v):.0f}" stroke="rgba(255,255,255,.06)"/>'
+                   f'<text x="{pad - 8}" y="{sy(v) + 3:.0f}" fill="var(--sub)" font-size="10" '
+                   f'font-family="JetBrains Mono" text-anchor="end">{v:.3f}</text>')
+    pts = [(a, b0 + b1 * a + b2 * a * a) for a in range(ax_lo * 2, ax_hi * 2 + 1)]
+    path = "M" + " L".join(f"{sx(a / 2):.0f} {sy(v):.0f}" for a, v in pts)
+    svg.append(f'<path d="{path}" fill="none" stroke="var(--a)" stroke-width="2.5"/>')
+    svg.append(f'<line x1="{sx(peak):.0f}" y1="{pad}" x2="{sx(peak):.0f}" y2="{H - pad}" '
+               f'stroke="var(--gold)" stroke-dasharray="4 4"/>'
+               f'<text x="{sx(peak):.0f}" y="{pad - 6}" fill="var(--gold)" font-size="10" '
+               f'font-family="JetBrains Mono" text-anchor="middle">peak ≈ {peak:.0f}</text>')
+    svg.append(f'<text x="{W / 2:.0f}" y="{H - 8}" fill="var(--sub)" font-size="11" '
+               f'font-family="Space Grotesk" text-anchor="middle">age</text>'
+               f'<text x="14" y="{H / 2:.0f}" fill="var(--sub)" font-size="11" font-family="Space Grotesk" '
+               f'text-anchor="middle" transform="rotate(-90 14 {H / 2:.0f})">fitted OPS</text></svg>')
+    return f'<div class="calib">{"".join(svg)}</div>'
+
+
+def _pythag_scatter_svg() -> str:
+    """Actual vs Pythagorean win% for every team-season in the warehouse — a real EDA scatter of the
+    gold aggregates. Points on the y=x line are 'as expected'; vertical distance is luck."""
+    teams = DATA.get("teams", [])
+    pts = [(t["pyth"], t["win_pct"]) for t in teams
+           if t.get("pyth") is not None and t.get("win_pct") is not None]
+    if not pts:
+        return ""
+    lo, hi = 0.30, 0.70
+    W, H, pad = 460, 360, 48
+
+    def sx(p):
+        return pad + (min(max(p, lo), hi) - lo) / (hi - lo) * (W - 2 * pad)
+
+    def sy(p):
+        return H - pad - (min(max(p, lo), hi) - lo) / (hi - lo) * (H - 2 * pad)
+    svg = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Scatter of actual versus Pythagorean '
+           f'win percentage for {len(pts)} team-seasons; the diagonal is expected, vertical gap is luck">']
+    for gv in (0.30, 0.40, 0.50, 0.60, 0.70):
+        svg.append(f'<line x1="{sx(gv):.0f}" y1="{sy(lo):.0f}" x2="{sx(gv):.0f}" y2="{sy(hi):.0f}" stroke="rgba(255,255,255,.06)"/>'
+                   f'<line x1="{sx(lo):.0f}" y1="{sy(gv):.0f}" x2="{sx(hi):.0f}" y2="{sy(gv):.0f}" stroke="rgba(255,255,255,.06)"/>'
+                   f'<text x="{sx(gv):.0f}" y="{H - pad + 16:.0f}" fill="var(--sub)" font-size="10" font-family="JetBrains Mono" text-anchor="middle">{gv:.2f}</text>'
+                   f'<text x="{pad - 8}" y="{sy(gv) + 3:.0f}" fill="var(--sub)" font-size="10" font-family="JetBrains Mono" text-anchor="end">{gv:.2f}</text>')
+    svg.append(f'<line x1="{sx(lo):.0f}" y1="{sy(lo):.0f}" x2="{sx(hi):.0f}" y2="{sy(hi):.0f}" '
+               f'stroke="var(--sub)" stroke-dasharray="4 4"/>')
+    for px, py in pts:
+        svg.append(f'<circle cx="{sx(px):.0f}" cy="{sy(py):.0f}" r="3.4" '
+                   f'fill="color-mix(in srgb,var(--a) 70%,transparent)" stroke="var(--a)" stroke-width="0.8"/>')
+    svg.append(f'<text x="{W / 2:.0f}" y="{H - 8}" fill="var(--sub)" font-size="11" font-family="Space Grotesk" text-anchor="middle">expected win% (Pythagorean)</text>'
+               f'<text x="14" y="{H / 2:.0f}" fill="var(--sub)" font-size="11" font-family="Space Grotesk" text-anchor="middle" transform="rotate(-90 14 {H / 2:.0f})">actual win%</text></svg>')
+    return f'<div class="calib">{"".join(svg)}</div>'
+
+
 def build_data_science() -> None:
     body = head("DIAMONDIQ — Modeling & Data Science",
                 "Thirteen baseball models with parity, evaluation, calibration, leakage discipline, "
@@ -1091,14 +1202,31 @@ def build_data_science() -> None:
              '<p class="lead">The glossary\'s "stable skill" vs "mostly luck" labels are not vibes — '
              'they are year-over-year self-correlations (min 300 PA both seasons). Higher = more '
              'repeatable skill; lower = more luck that won\'t carry over.</p>'
-             f'<div class="grid"><div class="card"><div class="name" style="font-size:18px">Year-over-year stability</div>{rows}'
+             '<div class="grid"><div class="card"><div class="name" style="font-size:18px">Year-over-year stability</div>'
+             + _stability_bar_svg() + rows +
              '<div class="read">K% and BB% are real, fast-stabilizing skills; BABIP is mostly noise, '
-             'which is exactly why M7 shrinks it toward the mean.</div></div>'
+             'which is exactly why M7 shrinks it toward the mean. Bars are the actual season-to-season '
+             'self-correlations (min 300 PA both years, n shown).</div></div>'
              '<div class="card"><div class="def">Every point estimate on this page carries an interval '
              'or an explicit n. A number without its uncertainty is marketing, not measurement.</div>'
-             f'<div class="read">Model results are anchored to published baseball values (known-answer '
-             f'tests); the parity gate proves R and Python agree, and the KAT proves they agree on '
-             f'something true. See <a href="data-eng.html#parity">the parity gate</a>.</div></div></div>')
+             '<div class="read">Model results are anchored to published baseball values (known-answer '
+             'tests); the parity gate proves R and Python agree, and the KAT proves they agree on '
+             'something true. See <a href="data-eng.html#parity">the parity gate</a>.</div></div></div>')
+    # aging curve — a real effect drawn on an honest axis
+    peak = DATA["metrics"].get("b3_aging", {}).get("python", {}).get("peak_age")
+    body += ('<div class="sec"><h2>A real effect, drawn honestly</h2><span class="line"></span></div>'
+             '<div class="grid"><div class="card"><div class="name" style="font-size:18px">The OPS aging curve (B3)</div>'
+             + _aging_curve_svg() +
+             f'<div class="read">The fitted quadratic peaks near age <b>{fmt(peak, 0)}</b> — the familiar '
+             'rise-and-decline. We draw it on a fixed OPS axis (0.600–0.800) rather than zooming in, so '
+             'the arc looks as shallow as it truly is: individual variation dwarfs the average age effect '
+             '(r² ≈ 0.001). Zooming the y-axis to fill the frame would turn a small, honest signal into a '
+             'dramatic-looking one — exactly the trick this site refuses.</div></div>'
+             '<div class="card"><div class="def">This is the same discipline as the effect sizes below: '
+             'the number is real and worth modeling, but the picture is scaled to its true magnitude, not '
+             'to whatever makes the story loudest.</div>'
+             '<div class="read">An honest chart and an honest confidence interval are the same promise in '
+             'two forms — show the signal <i>and</i> its size.</div></div></div>')
     # Effect-size interpretation (Funder & Ozer 2019)
     ef = DATA["effects"]
     st = DATA["stability"]
@@ -1219,6 +1347,28 @@ def build_data_eng() -> None:
     for name, desc in cats:
         body += f'<div class="card"><div class="name" style="font-size:17px">{name}</div><div class="def">{desc}</div></div>'
     body += '</div>'
+    # EDA sanity-check of the gold output: run differential predicts wins
+    nteams = len([t for t in DATA.get("teams", []) if t.get("pyth") is not None])
+    body += ('<div class="sec"><h2>What the gold aggregates look like</h2><span class="line"></span></div>'
+             '<p class="lead">A pipeline is only as good as the numbers that fall out of it. Here is a '
+             'straight EDA plot of the gold team-season table — no model, just the aggregates the '
+             'warehouse produces — as a sanity check that the joins, the run totals, and the grain are '
+             'sound.</p>'
+             f'<div class="grid"><div class="card"><div class="name" style="font-size:17px">Actual vs. expected wins '
+             f'({nteams} team-seasons)</div>'
+             + _pythag_scatter_svg() +
+             '<div class="read">Each dot is one team-season: expected win% from run differential '
+             '(Pythagorean) on the x-axis, actual win% on the y. Points hug the diagonal — run '
+             'differential really does predict record — and the vertical scatter around it is the '
+             'season-to-season <b>luck</b> the models on the science page try to separate from skill. A '
+             'broken join or a double-counted game would show up here as points flying off the line; they '
+             'don\'t.</div></div>'
+             '<div class="card"><div class="def">Why this belongs on the engineering page: it is the '
+             'cheapest, most honest data-quality test there is — plot the output and look at it. The dbt '
+             'tests prove the grain and the keys; this shows the <i>values</i> are physically plausible.</div>'
+             '<div class="read">Same data feeds baseline B1 (Pythagoras) on the '
+             '<a href="data-science.html#effects" style="color:var(--a)">data-science page</a>, where the '
+             'residual becomes the skill-vs-luck story.</div></div></div>')
     # parity gate explained (README-sourced)
     tiers = parity_tiers()
     trows = "".join(
@@ -1488,10 +1638,13 @@ def build_index() -> None:
              '<div class="d">Model-vs-baseline honesty, calibration for pricing, American-odds fluency, '
              'and a flat sortable odds table. Descriptive only — no picks.</div>'
              '<div class="go">Enter →</div></a>'
-             '<a class="door" href="data-eng.html"><div class="t">I\'m a data person</div>'
-             '<div class="d">The medallion pipeline and the R↔Python parity gate '
-             '(<a href="data-science.html" style="color:var(--a)">or jump to the models &amp; '
-             'calibration</a>).</div>'
+             '<a class="door" href="data-eng.html"><div class="t">I\'m a data engineer</div>'
+             '<div class="d">The medallion pipeline, the DuckDB warehouse and dbt star schema, '
+             'and the R↔Python parity gate that keeps every model honest.</div>'
+             '<div class="go">Enter →</div></a>'
+             '<a class="door" href="data-science.html"><div class="t">I\'m a data scientist</div>'
+             '<div class="d">The 13 models, effect sizes with the uncertainty left in, and the '
+             'calibration that shows how well a game can really be predicted.</div>'
              '<div class="go">Enter →</div></a></div>')
     _write("index.html", body)
 
