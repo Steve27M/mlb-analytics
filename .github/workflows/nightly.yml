@@ -4,10 +4,28 @@ name: nightly-2026-refresh
 # warehouse (reproduces exactly) and the live 2026 warehouse, regenerate the site, commit the
 # changed pages. Python-only — the frozen 13 models never refit nightly (metrics.json is committed),
 # so no R toolchain is needed. See DECISIONS.md and README.
+#
+# COLD-START SEEDING (one-time): the nightly relies on a persisted bronze cache so it only pulls the
+# 2026 delta. Until that cache exists, a scheduled run crawls 3+ full seasons, exceeds timeout-minutes,
+# and is CANCELLED — and a cancelled job skips the cache-save post-step, so the cache never seeds
+# (a deadlock). Break it with a manual workflow_dispatch, either:
+#   (a) one shot: leave seed_seasons blank, set timeout_minutes high (e.g. 350) so the full cold run
+#       finishes and publishes; or
+#   (b) safer, in <90-min chunks: run seed_seasons="2023", then "2023,2024", then "2023,2024,2025"
+#       (each warms bronze via ingest only, no publish), then let the schedule pick up the 2026 delta.
 on:
   schedule:
     - cron: "30 10 * * *"      # ~10:30 UTC (~6:30 ET); Actions cron has jitter, fine for nightly
-  workflow_dispatch: {}          # manual trigger (use this for the first, cache-seeding run)
+  workflow_dispatch:
+    inputs:
+      timeout_minutes:
+        description: "Job timeout in minutes. Bump (e.g. 350) for a one-shot cold-seeding run."
+        required: false
+        default: "90"
+      seed_seasons:
+        description: "Cache-seeding only: ingest these seasons (e.g. 2023 or 2023,2024) and skip publish. Blank = normal full refresh."
+        required: false
+        default: ""
 
 permissions:
   contents: write                # the bot commits refreshed docs/ to main -> Pages redeploys
@@ -19,14 +37,13 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: ${{ fromJSON(github.event.inputs.timeout_minutes || '90') }}
     steps:
       - uses: actions/checkout@v4
 
       # bronze/warehouse are gitignored (regenerate, never commit). Persist bronze between runs so
       # ingest pulls only the 2026 delta instead of re-crawling 3+ seasons (idempotent, cache-first).
-      # COLD START: the very first run has no cache and will crawl all seasons (hours) — trigger it
-      # manually via workflow_dispatch and let it finish once; every run after is a fast delta.
+      # See the COLD-START SEEDING note at the top of this file for how to seed the very first cache.
       - name: Restore bronze cache
         uses: actions/cache@v4
         with:
@@ -46,10 +63,17 @@ jobs:
       - name: Refresh
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-          MLB_SEASONS: "2023,2024,2025,2026"   # idempotent: 2023-25 cache-hit, 2026 delta pulls
+          # seed_seasons (manual) narrows the crawl for a cache warm-up; otherwise the full frozen+live set.
+          MLB_SEASONS: ${{ github.event.inputs.seed_seasons || '2023,2024,2025,2026' }}
+          SEED_SEASONS: ${{ github.event.inputs.seed_seasons }}
           MLB_DUCKDB_PATH: data/warehouse.duckdb
           MLB_LIVE_DUCKDB_PATH: data/warehouse_live.duckdb
         run: |
+          if [ -n "$SEED_SEASONS" ]; then
+            echo "::notice::cache-seeding run for seasons $MLB_SEASONS (ingest only, no land/build/publish)"
+            uv run python run.py ingest       # warm bronze; the cache-save post-step then persists it
+            exit 0
+          fi
           t=$SECONDS
           uv run python run.py ingest        # statsapi/Savant delta + daily closing-line snapshot
           export MLB_RUN_INGEST_SEC=$((SECONDS - t))   # feeds the ops.py SPC series
@@ -64,6 +88,7 @@ jobs:
           uv run python run.py dashboard     # prepare + season_sim + live_sim + ops + build_site
 
       - name: Commit refreshed site (+ heartbeat keeps the schedule alive off-season)
+        if: ${{ github.event.inputs.seed_seasons == '' }}   # seeding runs ingest only; never publish
         run: |
           mkdir -p docs/data
           date -u +"%Y-%m-%dT%H:%M:%SZ" > docs/data/last_run.txt
