@@ -56,9 +56,6 @@ dbt/.user.yml
 .idea/
 .vscode/
 
-# local agent operating rules — not published
-CLAUDE.md
-
 # stray odds key notes (never commit)
 *odds*.txt
 *.env*.txt
